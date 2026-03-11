@@ -326,7 +326,8 @@ INITMAPS        ; initialize maps
  S @G@(MAP,"CODE","20570-8","HCT")=""
  S @G@(MAP,"CODE","19123-9","MAGNESIUM")=""
  S @G@(MAP,"CODE","788-0","RDW-CV")=""
- S @G@(MAP,"CODE","33914-3","COMPUTED CREATININE CLEARANCE")=""
+ ; Fallback to an always-available chemistry test in VA-ready test builds.
+ S @G@(MAP,"CODE","33914-3","CREATININE")=""
  S @G@(MAP,"CODE","3173-2","PTT")=""
  S @G@(MAP,"CODE","2276-4","FERRITIN")=""
  S @G@(MAP,"CODE","2746-6","PH ")="" ; not a typo, it really has a space
