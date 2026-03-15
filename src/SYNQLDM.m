@@ -493,20 +493,16 @@ GETMAP(RTN,MAP) ; returns an array of the MAP. if MAP is not specified, it retur
  Q
  ;
 MAPERR(CDE,MAP,CMT) ; add the map error to the mapping-errors graph
- n DERR,FDA,GIEN,MEIEN
- s GIEN=$o(^SYNGRAPH(2002.801,"B","mapping-errors",0))
- i +GIEN<1 d  ;
- . s FDA(2002.801,"?+1,",.01)="mapping-errors"
- . d UPDATE^DIE("","FDA",,"DERR")
- . s GIEN=$o(^SYNGRAPH(2002.801,"B","mapping-errors",0))
- q:+GIEN<1
- s MEIEN=$o(^SYNGRAPH(2002.801,GIEN,"errors","B",CDE,0))
+ n GROOT,MEIEN
+ s GROOT=$$setroot^SYNWD("mapping-errors")
+ q:GROOT=""
+ s MEIEN=$o(@GROOT@("errors","B",CDE,0))
  i +MEIEN<1 d  ;
- . s MEIEN=$o(^SYNGRAPH(2002.801,GIEN,"errors"," "),-1)+1
- . s ^SYNGRAPH(2002.801,GIEN,"errors",MEIEN,"code")=CDE
- . s ^SYNGRAPH(2002.801,GIEN,"errors","B",CDE,MEIEN)=""
- s ^SYNGRAPH(2002.801,GIEN,"errors",MEIEN,"map")=$g(MAP)
- i $g(CMT)'="" s ^SYNGRAPH(2002.801,GIEN,"errors",MEIEN,"comment")=CMT
- s ^SYNGRAPH(2002.801,GIEN,"errors",MEIEN,"count")=$g(^SYNGRAPH(2002.801,GIEN,"errors",MEIEN,"count"))+1
+ . s MEIEN=$o(@GROOT@("errors"," "),-1)+1
+ . s @GROOT@("errors",MEIEN,"code")=CDE
+ . s @GROOT@("errors","B",CDE,MEIEN)=""
+ s @GROOT@("errors",MEIEN,"map")=$g(MAP)
+ i $g(CMT)'="" s @GROOT@("errors",MEIEN,"comment")=CMT
+ s @GROOT@("errors",MEIEN,"count")=$g(@GROOT@("errors",MEIEN,"count"))+1
  q
  ;

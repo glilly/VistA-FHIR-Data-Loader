@@ -24,22 +24,76 @@ SYNWD     ;ven/gpl - mash graph utilities ; 9/24/17 4:33pm
  ; graph handling routines
  ;
 setroot(graph) ; root of working storage
+ new RTN set RTN=$$GRTN($get(graph))
+ if RTN="%wd" quit $$setroot^%wd(graph)
  quit $$setroot^SYNGRAF(graph)
  ;
 rootOf(graph) ; return the root of graph named graph
+ new RTN set RTN=$$GRTN($get(graph))
+ if RTN="%wd" quit $$rootOf^%wd(graph)
  quit $$rootOf^SYNGRAF(graph)
  ;
 addgraph(graph) ; makes a place in the graph file for a new graph
- do addgraph^SYNGRAF(graph)
- quit
+ new RTN set RTN=$$GRTN($get(graph))
+ if RTN="%wd" quit $$addgraph^%wd(graph)
+ quit $$addgraph^SYNGRAF(graph)
  ;
 purgegraph(graph) ; delete a graph
- do purgegraph^SYNGRAF(graph)
- quit
+ new RTN set RTN=$$GRTN($get(graph))
+ if RTN="%wd" quit $$purgegraph^%wd(graph)
+ quit $$purgegraph^SYNGRAF(graph)
  ;
 insert2graph(ary,graph,replace) ; insert a new entry to a graph
+ new RTN set RTN=$$GRTN($get(graph))
+ if RTN="%wd" do insert2graph^%wd(.ary,graph,replace) quit
  do insert2graph^SYNGRAF(.ary,graph,replace)
  quit
+ ;
+GRTN(GRAPH) ; detect the active graph backend for a named graph
+ set GRAPH=$get(GRAPH)
+ if $$SYNHAS(GRAPH) quit "SYNGRAF"
+ if $$WDHAS(GRAPH) quit "%wd"
+ ;
+ ; If the requested graph does not exist yet, follow the store that already
+ ; owns the standard SYN working graphs on this system.
+ if $$SYNHAS("fhir-intake") quit "SYNGRAF"
+ if $$WDHAS("fhir-intake") quit "%wd"
+ if $$SYNHAS("loinc-lab-map") quit "SYNGRAF"
+ if $$WDHAS("loinc-lab-map") quit "%wd"
+ if $$SYNHAS("html-cache") quit "SYNGRAF"
+ if $$WDHAS("html-cache") quit "%wd"
+ if $$SYNHAS("seeGraph") quit "SYNGRAF"
+ if $$WDHAS("seeGraph") quit "%wd"
+ ;
+ if $$SYNOK,'$$WDOK quit "SYNGRAF"
+ if $$WDOK,'$$SYNOK quit "%wd"
+ ;
+ ; This branch is vaready-derived, so new graphs default to SYNGRAPH when
+ ; both backends are present but no existing graph anchors the choice.
+ if $$SYNOK quit "SYNGRAF"
+ if $$WDOK quit "%wd"
+ quit "SYNGRAF"
+ ;
+WDOK() ; legacy %wd graph store is available
+ quit $select($text(setroot^%wd)="":0,$piece($get(^DIC(17.040801,0)),"^")="":0,1:1)
+ ;
+SYNOK() ; SYNGRAPH graph store is available
+ quit $select($text(setroot^SYNGRAF)="":0,$piece($get(^DIC(2002.801,0)),"^")="":0,1:1)
+ ;
+WDHAS(GRAPH) ; named graph already exists in the %wd store
+ new GIEN,ROOT
+ if $get(GRAPH)="" quit 0
+ if '$$WDOK quit 0
+ set ROOT="^"_$char(37)_"wd(17.040801,""B"")"
+ set GIEN=$order(@ROOT@(GRAPH,0))
+ quit $select(+GIEN>0:1,1:0)
+ ;
+SYNHAS(GRAPH) ; named graph already exists in the SYNGRAPH store
+ new GIEN
+ if $get(GRAPH)="" quit 0
+ if '$$SYNOK quit 0
+ set GIEN=$order(^SYNGRAPH(2002.801,"B",GRAPH,0))
+ quit $select(+GIEN>0:1,1:0)
  ;
 nameThis(altname) ; returns the id to be used for altname
  ; this will eventually use the context graph and the

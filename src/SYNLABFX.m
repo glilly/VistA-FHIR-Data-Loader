@@ -28,7 +28,7 @@ run(rtn,ien,args,dofix) ; core
  n zi,cat,loinc,txt,map,tien,tname,chg,samp
  ;
  i ien<1 s rtn("error")="missing graph IEN" q
- s root=$$setroot^%wd("fhir-intake")
+ s root=$$setroot^SYNWD("fhir-intake")
  s troot=$na(@root@(ien,"type","Observation"))
  s json=$na(@root@(ien,"json"))
  i '$d(@troot) s rtn("error")="no observation graph for ien "_ien q

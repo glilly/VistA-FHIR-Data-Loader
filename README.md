@@ -10,6 +10,9 @@ create patients on test VistA systems.
 For lab ingestion troubleshooting and accession-area remediation, see
 `docs/LAB_ACCESSION_REMEDIATION_WORKFLOW.md`.
 
+For graph-store backend compatibility between `%wd` and `^SYNGRAPH`, see
+`docs/GRAPH_STORE_COMPATIBILITY.md`.
+
 ## OS5 map generation
 
 The SNOMED-to-OS5 map used by SYN lives in `^SYN("2002.030","sct2os5",...)`.
