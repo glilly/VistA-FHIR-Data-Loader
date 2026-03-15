@@ -20,10 +20,14 @@ repository. The script refreshes:
 - `maps/SYNOS5.GO`
 - `docs/SYNOS5.generated.json`
 - `src/SYNOS5LD.m`
-- `src/SYNOS5DT.m`
+- `src/SYNOS5D*.m` generated data routines
 
 At install/build time, `EN^SYNGBLLD` now calls `LOADOS5^SYNOS5LD` to rebuild
 the `sct2os5` nodes in `^SYN`.
+
+For release-engineering guidance on how these generated artifacts and related
+loader fixes affect future KIDS builds, see
+`docs/FUTURE_KIDS_PACKAGING.md`.
 
 # Pre-installation Requirements
 The Installer DUZ must have the key XUMGR in order to be able to add users to
