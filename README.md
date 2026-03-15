@@ -10,6 +10,21 @@ create patients on test VistA systems.
 For lab ingestion troubleshooting and accession-area remediation, see
 `docs/LAB_ACCESSION_REMEDIATION_WORKFLOW.md`.
 
+## OS5 map generation
+
+The SNOMED-to-OS5 map used by SYN lives in `^SYN("2002.030","sct2os5",...)`.
+Use `generate_synthea_os5_map.py` to regenerate the map from the Synthea
+SNOMED ValueSet files in the sibling `VistA-FHIR-Server-Codex/codes`
+repository. The script refreshes:
+
+- `maps/SYNOS5.GO`
+- `docs/SYNOS5.generated.json`
+- `src/SYNOS5LD.m`
+- `src/SYNOS5DT.m`
+
+At install/build time, `EN^SYNGBLLD` now calls `LOADOS5^SYNOS5LD` to rebuild
+the `sct2os5` nodes in `^SYN`.
+
 # Pre-installation Requirements
 The Installer DUZ must have the key XUMGR in order to be able to add users to
 the systems. You will be blocked from installing if you don't have that
