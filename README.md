@@ -13,6 +13,10 @@ For lab ingestion troubleshooting and accession-area remediation, see
 For graph-store backend compatibility between `%wd` and `^SYNGRAPH`, see
 `docs/GRAPH_STORE_COMPATIBILITY.md`.
 
+For the live VEHU validation run that exposed and fixed the optional
+`DHPCSAMP` GT.M/YottaDB lab-loader bug, see
+`docs/VEHU_NEW_PATIENT_VALIDATION_2026-03-16.md`.
+
 ## OS5 map generation
 
 The SNOMED-to-OS5 map used by SYN lives in `^SYN("2002.030","sct2os5",...)`.
