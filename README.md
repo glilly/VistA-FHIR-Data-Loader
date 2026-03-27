@@ -36,6 +36,9 @@ For release-engineering guidance on how these generated artifacts and related
 loader fixes affect future KIDS builds, see
 `docs/FUTURE_KIDS_PACKAGING.md`.
 
+To verify install health and OS5 map completeness on a running system, see
+`docs/SYNAUDIT.md` (routine `SYNAUDIT`, `D EN^SYNAUDIT`).
+
 # Pre-installation Requirements
 The Installer DUZ must have the key XUMGR in order to be able to add users to
 the systems. You will be blocked from installing if you don't have that
