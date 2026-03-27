@@ -39,6 +39,9 @@ loader fixes affect future KIDS builds, see
 To verify install health and OS5 map completeness on a running system, see
 `docs/SYNAUDIT.md` (routine `SYNAUDIT`, `D EN^SYNAUDIT`).
 
+For planning work on filing **TIU notes** (#8925) and visit linkage (inpatient vs
+outpatient), see `docs/NOTES_AND_TIU_LOAD_PLANNING.md`.
+
 # Pre-installation Requirements
 The Installer DUZ must have the key XUMGR in order to be able to add users to
 the systems. You will be blocked from installing if you don't have that
