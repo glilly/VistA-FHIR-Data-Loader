@@ -127,6 +127,26 @@ wsReplayIntake(RTN,FILTER) ; GET replayIntake?ien=&dfn= — rerun IMPORTFHIRDOMS
  s HTTPRSP("mime")="application/json"
  q
  ;
+wsShow(OUT,FILTER) ; GET showfhir — graph-stored intake JSON by ien / icn / dfn (optional type= resourceType)
+ ; Registered as wsShow^SYNFHIR; must exist here — %webrsp dispatches by label name.
+ n root,type,ien,icn,dfn,tmp,err
+ s root=$$setroot^SYNWD("fhir-intake")
+ s type=$g(FILTER("type"))
+ s ien=+$g(FILTER("ien"))
+ i ien<1 s icn=$g(FILTER("icn")) i icn'="" s ien=$o(@root@("ICN",icn,""))
+ i ien<1 s dfn=$g(FILTER("dfn")) i dfn'="" s ien=$o(@root@("DFN",dfn,""))
+ q:ien<1
+ i type'="" d getIntakeFhir^SYNFHIR("tmp",$g(FILTER("bundle")),type,ien,1)
+ e  d
+ . i '$d(@root@(ien,"json")) q
+ . m tmp=@root@(ien,"json")
+ i '$d(tmp) q
+ i $t(encode^SYNJSON)'="" d encode^SYNJSON("tmp","OUT") g WSSHOWX
+ i $t(TOJSON^C0FHIRBU)'="" d TOJSON^C0FHIRBU(.tmp,.OUT,.err) g WSSHOWX
+ d ENCODE^XLFJSON("tmp","OUT")
+WSSHOWX s HTTPRSP("mime")="application/json"
+ q
+ ;
 indexFhir(ien)  ; generate indexes for parsed fhir json
  ;
  new root set root=$$setroot^SYNWD("fhir-intake")
