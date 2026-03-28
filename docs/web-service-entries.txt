@@ -31,4 +31,8 @@ NUMBER: 9                               HTTP VERB: POST                         
 
 NUMBER: 10                              HTTP VERB: POST                         URI: addcondition
   EXECUTION ENDPOINT: wsIntakeConditions^SYNFCON
+
+NUMBER: (site)                          HTTP VERB: GET                          URI: replayIntake
+  EXECUTION ENDPOINT: wsReplayIntake^SYNFHIR
+  NOTE: Rerun labs..careplan from graph JSON without POST addPatient (duplicate SSN recovery).
 

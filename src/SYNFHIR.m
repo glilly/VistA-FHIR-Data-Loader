@@ -57,24 +57,75 @@ wsPostFHIR(ARGS,BODY,RESULT,ien)    ; recieve from addpatient
  new rdfn set rdfn=$get(return("dfn"))
  if rdfn'="" set @root@("DFN",rdfn,ien)=""
  ;
- if rdfn'="" do  ; patient creation was successful
- . if $g(ARGS("load"))="" s ARGS("load")=1
- . new DIQUIET set DIQUIET=1 ; Fileman don't talk
- . do importLabs^SYNFLAB(.return,ien,.ARGS)
- . do importVitals^SYNFVIT(.return,ien,.ARGS)
- . do importEncounters^SYNFENC(.return,ien,.ARGS)
- . do importImmu^SYNFIMM(.return,ien,.ARGS)
- . do importConditions^SYNFPRB(.return,ien,.ARGS)
- . do importAllergy^SYNFALG(.return,ien,.ARGS)
- . do importAppointment^SYNFAPT(.return,ien,.ARGS)
- . do importMeds^SYNFMED2(.return,ien,.ARGS)
- . do importProcedures^SYNFPROC(.return,ien,.ARGS)
- . do importCarePlan^SYNFCP(.return,ien,.ARGS)
+ if rdfn'="" do IMPORTFHIRDOMS^SYNFHIR(.return,ien,.ARGS)
  ;
  do ENCODE^XLFJSON("return","RESULT")
  set HTTPRSP("mime")="application/json"
  ;
  quit 1
+ ;
+IMPORTFHIRDOMS(rtn,ien,ARGS) ; labs..careplan from graph JSON (Patient must already exist)
+ ; Expects rtn("dfn") set by caller when needed for downstream status; imports use graph ien.
+ if $g(ARGS("load"))="" s ARGS("load")=1
+ n DIQUIET s DIQUIET=1
+ d importLabs^SYNFLAB(.rtn,ien,.ARGS)
+ d importVitals^SYNFVIT(.rtn,ien,.ARGS)
+ d importEncounters^SYNFENC(.rtn,ien,.ARGS)
+ d importImmu^SYNFIMM(.rtn,ien,.ARGS)
+ d importConditions^SYNFPRB(.rtn,ien,.ARGS)
+ d importAllergy^SYNFALG(.rtn,ien,.ARGS)
+ d importAppointment^SYNFAPT(.rtn,ien,.ARGS)
+ d importMeds^SYNFMED2(.rtn,ien,.ARGS)
+ d importProcedures^SYNFPROC(.rtn,ien,.ARGS)
+ d importCarePlan^SYNFCP(.rtn,ien,.ARGS)
+ q
+ ;
+RESOLVDFN(ien,ARGS) ; extrinsic: DFN for graph ien (ARGS("dfn") wins; else Patient status; else indexes)
+ n root,r,dfn,maxd
+ s root=$$setroot^SYNWD("fhir-intake")
+ s r=+$g(ARGS("dfn")) i r>0 q r
+ s r=+$g(@root@(ien,"load","Patient","status","DFN")) i r>0 q r
+ s r=+$$ien2dfn^SYNFUTL(ien) i r>0 q r
+ s (maxd,dfn)=0
+ f  s dfn=$o(@root@("DFN",dfn)) q:dfn<1  d
+ . i $d(@root@("DFN",dfn,ien)),dfn>maxd s maxd=dfn
+ q maxd
+ ;
+replayIntakeDomains(rtn,ien,ARGS) ; rerun all non-Patient loaders from stored bundle JSON
+ ; Use after Duplicate SSN (or any) left a graph row without running domains: pass ARGS("dfn") for the existing VistA patient.
+ n root,rdfn
+ s root=$$setroot^SYNWD("fhir-intake")
+ i '$d(@root@(ien,"json","entry")) d  q
+ . s rtn("status")="error"
+ . s rtn("reason")="no bundle JSON at this graph ien"
+ i $g(ARGS("reindex"))'=0 d indexFhir(ien)
+ s rdfn=$$RESOLVDFN(ien,.ARGS)
+ i +rdfn<1 d  q
+ . s rtn("status")="error"
+ . s rtn("reason")="cannot resolve DFN; pass filter dfn (or ARGS(""dfn"")) for orphan graph after failed patient filing"
+ s @root@("DFN",rdfn,ien)=""
+ s rtn("ien")=ien,rtn("dfn")=rdfn,rtn("status")="ok"
+ d IMPORTFHIRDOMS^SYNFHIR(.rtn,ien,.ARGS)
+ q
+ ;
+wsReplayIntake(RTN,FILTER) ; GET replayIntake?ien=&dfn= — rerun IMPORTFHIRDOMS from graph
+ ; Pass ien for the graph row holding the Synthea JSON. If that row is orphan (duplicate SSN), pass dfn of the existing patient too.
+ ; If only dfn is passed, ien is $$dfn2ien (latest linked graph for that patient).
+ n return,ARGS,ien,dfn
+ s ien=+$g(FILTER("ien"))
+ s dfn=+$g(FILTER("dfn"))
+ i ien<1,dfn>0 s ien=$$dfn2ien^SYNFUTL(dfn)
+ i ien<1 d  q
+ . s return("status")="error",return("reason")="need ien or dfn that resolves to a graph ien"
+ . d ENCODE^XLFJSON("return","RTN")
+ . s HTTPRSP("mime")="application/json"
+ s ARGS("load")=$s($g(FILTER("load"))'="":+$g(FILTER("load")),1:1)
+ s ARGS("dfn")=dfn
+ s ARGS("reindex")=$s($g(FILTER("reindex"))="":1,1:+$g(FILTER("reindex")))
+ d replayIntakeDomains^SYNFHIR(.return,ien,.ARGS)
+ d ENCODE^XLFJSON("return","RTN")
+ s HTTPRSP("mime")="application/json"
+ q
  ;
 indexFhir(ien)  ; generate indexes for parsed fhir json
  ;
