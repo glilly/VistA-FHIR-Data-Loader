@@ -53,6 +53,21 @@ wsIntakeCareplan(args,body,result,ien)        ; web service entry (post)
  i $g(dfn)="" do  quit  ; need the patient
  . s result("careplan",1,"log",1)="Error, patient not found.. terminating"
  ;
+ ; One-shot clear of graph encounter notes for CarePlan-linked encounters so
+ ; replayIntake (or any re-run of this pass) does not stack duplicate TONOTE blocks.
+ i $g(ien)'="" d
+ . n zj,zt,zref,seen
+ . k seen
+ . s zj=0 f  s zj=$o(json("entry",zj)) q:+zj=0  d
+ . . s zt=$g(json("entry",zj,"resource","resourceType"))
+ . . q:zt'="CarePlan"
+ . . s zref=$g(json("entry",zj,"resource","context","reference"))
+ . . i zref="" s zref=$g(json("entry",zj,"resource","encounter","reference"))
+ . . q:zref=""
+ . . q:$d(seen(zref))
+ . . s seen(zref)=""
+ . . d KILLNOTE^SYNFTIU(ien,zref)
+ ;
  ;
  new zi s zi=0
  for  set zi=$order(json("entry",zi)) quit:+zi=0  do  ;
