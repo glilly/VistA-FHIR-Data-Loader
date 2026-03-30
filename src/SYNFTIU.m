@@ -3,7 +3,29 @@ SYNFTIU  ;ven/gpl - fhir loader utilities ;2018-08-17  3:27 PM
  ;
  ; Authored by George P. Lilly 2017-2018
  ;
- ; Encounter TIU note utilities
+ ; Encounter TIU note utilities (graph-store lines under load,encounters,rien,note)
+ q
+ ;
+INTROOT() ; fhir-intake root - must match SYNFHIR/SYNFCP (SYNWD routes to %wd or SYNGRAF)
+ n r
+ i $l($t(+0^SYNWD)) s r=$$setroot^SYNWD("fhir-intake")
+ e  s r=$$setroot^%wd("fhir-intake")
+ q r
+ ;
+CANDS(enc,ary) ; candidate PSO index keys for Encounter (same subject as setIndex^SYNFHIR purl)
+ n n,u
+ k ary
+ q:$g(enc)=""
+ s n=1,ary(1)=enc
+ i enc["urn:uuid:" d  ;
+ . s u=$p(enc,"urn:uuid:",2)
+ . i u'="" s n=n+1,ary(n)=u s n=n+1,ary(n)="Encounter/"_u
+ i enc["Encounter/" d  ;
+ . s u=$p(enc,"Encounter/",2)
+ . i u'="" s n=n+1,ary(n)=enc s n=n+1,ary(n)="urn:uuid:"_u s n=n+1,ary(n)=u
+ e  i enc'["/",enc'["urn" d  ;
+ . s n=n+1,ary(n)="Encounter/"_enc
+ . s n=n+1,ary(n)="urn:uuid:"_enc
  q
  ;
 TONOTE(ien,enc,line) ; insert a line to the note associated with encounter enc
@@ -26,9 +48,14 @@ TONOTE(ien,enc,line) ; insert a line to the note associated with encounter enc
  ;
 NOTEPTR(ien,enc) ; returns a global pointer to the note for this encounter
  ; ien is the patient graph
- n root s root=$$setroot^%wd("fhir-intake")
- n groot s groot=$na(@root@(ien))
- n encien s encien=$o(@groot@("PSO","rien",enc,""))
+ n root,groot,encien,ci,cand,cands
+ s root=$$INTROOT^SYNFTIU
+ s groot=$na(@root@(ien))
+ d CANDS^SYNFTIU($g(enc),.cands)
+ s encien=""
+ f ci=1:1 q:'$d(cands(ci))  q:encien'=""  d  ;
+ . s cand=$g(cands(ci)) q:cand=""
+ . s encien=$o(@groot@("PSO","rien",cand,""))
  q:encien="" ""
  n nroot s nroot=$na(@groot@("load","encounters",encien,"note"))
  q nroot
@@ -41,7 +68,7 @@ KILLNOTE(ien,enc) ; kill the note for this encounter
  q
  ;
 CLRNOTES(ien,rien) ; kill all notes for patient ien
- n root s root=$$setroot^%wd("fhir-intake")
+ n root s root=$$INTROOT^SYNFTIU
  n groot s groot=$na(@root@(ien,"load","encounters"))
  n zi s zi=0
  f  s zi=$o(@groot@(zi)) q:+zi=0  d  ;
