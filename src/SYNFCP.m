@@ -41,7 +41,7 @@ wsIntakeCareplan(args,body,result,ien)        ; web service entry (post)
  n root,troot
  s root=$$setroot^SYNWD("fhir-intake")
  ;
- n jtmp,json,jrslt,eval
+ n jtmp,json,jrslt,eval,cpnoteclear
  i $g(ien)'="" d  ; internal call
  . s troot=$na(@root@(ien,"type","CarePlan"))
  . s eval=$na(@root@(ien,"load")) ; move eval to the graph
@@ -62,21 +62,7 @@ wsIntakeCareplan(args,body,result,ien)        ; web service entry (post)
  i $g(dfn)="" do  quit  ; need the patient
  . s result("careplan",1,"log",1)="Error, patient not found.. terminating"
  ;
- ; One-shot clear of graph encounter notes for CarePlan-linked encounters so
- ; replayIntake (or any re-run of this pass) does not stack duplicate TONOTE blocks.
- i $g(ien)'="" d
- . n zj,zt,zref,seen
- . k seen
- . s zj=0 f  s zj=$o(@troot@(zj)) q:+zj=0  d
- . . s zt=$g(@json@("entry",zj,"resource","resourceType"))
- . . q:zt'="CarePlan"
- . . s zref=$g(@json@("entry",zj,"resource","context","reference"))
- . . i zref="" s zref=$g(@json@("entry",zj,"resource","encounter","reference"))
- . . q:zref=""
- . . q:$d(seen(zref))
- . . s seen(zref)=""
- . . d KILLNOTE^SYNFTIU(ien,zref)
- ;
+ k cpnoteclear
  ;
  new zi s zi=0
  for  set zi=$order(@troot@(zi)) quit:+zi=0  do  ;
@@ -128,6 +114,12 @@ wsIntakeCareplan(args,body,result,ien)        ; web service entry (post)
  . . s @eval@("careplan",zi,"vars","visitDate")=visitDate
  . . d log(jlog,"visit date is: "_visitDate)
  . e  d log(jlog,"visit date unknow")
+ . ;
+ . ; Clear graph encounter note once per encounter when this pass actually
+ . ; processes a plan (avoids blanket clear when all entries skip loadStatus).
+ . i $g(ien)'="",encounterId'="" i '$d(cpnoteclear(encounterId)) d
+ . . d KILLNOTE^SYNFTIU(ien,encounterId)
+ . . s cpnoteclear(encounterId)=""
  . ;
  . ; determine the category code
  . ;
