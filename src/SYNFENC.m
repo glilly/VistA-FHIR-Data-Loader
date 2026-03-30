@@ -224,8 +224,12 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . . . s @eval@("encounters","status","errors")=$g(@eval@("encounters","status","errors"))+1
  . . . s @eval@("encounters",zi,"status","loadstatus")="notLoaded"
  . . . s @eval@("encounters",zi,"status","loadMessage")=$g(RETSTA)
- . . ;k @root@(ien,"load","encounters",zi)
- . . ;m @root@(ien,"load","encounters",zi)=@eval@("encounters",zi)
+ . . k @root@(ien,"load","encounters",zi)
+ . . m @root@(ien,"load","encounters",zi)=@eval@("encounters",zi)
+ . . ; FHIR Encounter.note -> fhir-intake graph (TONOTEZI) + visit-linked TIU (MAKE^TIUSRVP)
+ . . i +$g(RETSTA)=1,+visitIen>0,$g(args("skipEncounterNotes"))'=1,$t(INGESTFHIR^SYNFTIU)'="" d  ;
+ . . . d INGESTFHIR^SYNFTIU(ien,zi,id,dfn,visitIen,jlog,.json,.args)
+ . . . i $d(@root@(ien,"load","encounters",zi,"note")) m @eval@("encounters",zi,"note")=@root@(ien,"load","encounters",zi,"note")
  ;
  if $get(args("debug"))=1 do  ;
  . m jrslt("source")=json
