@@ -280,6 +280,7 @@ wsLoadPat(zrtn,zfilter) ; load one patient from a URL
  ; zfilter("url")=patienturl
  ; zfilter("id")=patientID
  ; returns same as wsPostFHIR^SYNFHIR
+ ; VistA-native bundle: GET .../fhir?dfn= (WEB^C0FHIRWS). showfhir is fhir-intake graph only.
  ;
  s U="^"
  n ARGS
