@@ -1,20 +1,7 @@
 SYNFTIU  ;ven/gpl - fhir loader utilities ;2018-08-17  3:27 PM
- ;;0.7;VISTA SYN DATA LOADER;;Mar 18, 2025
+ ;;0.3;VISTA SYNTHETIC DATA LOADER;;Jul 01, 2019;Build 13
  ;
- ; Copyright (c) 2017-2018 George P. Lilly
- ;
- ;Licensed under the Apache License, Version 2.0 (the "License");
- ;you may not use this file except in compliance with the License.
- ;You may obtain a copy of the License at
- ;
- ;    http://www.apache.org/licenses/LICENSE-2.0
- ;
- ;Unless required by applicable law or agreed to in writing, software
- ;distributed under the License is distributed on an "AS IS" BASIS,
- ;WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- ;See the License for the specific language governing permissions and
- ;limitations under the License.
- ;
+ ; Authored by George P. Lilly 2017-2018
  ;
  ; Encounter TIU note utilities (graph-store lines under load,encounters,rien,note)
  q
@@ -61,7 +48,6 @@ TONOTE(ien,enc,line) ; insert a line to the note associated with encounter enc
  ;
 NOTEPTR(ien,enc) ; returns a global pointer to the note for this encounter
  ; ien is the patient graph
-=======TEMP=======
  n root,groot,encien,ci,cand,cands
  s root=$$INTROOT^SYNFTIU
  s groot=$na(@root@(ien))
@@ -70,7 +56,6 @@ NOTEPTR(ien,enc) ; returns a global pointer to the note for this encounter
  f ci=1:1 q:'$d(cands(ci))  q:encien'=""  d  ;
  . s cand=$g(cands(ci)) q:cand=""
  . s encien=$o(@groot@("PSO","rien",cand,""))
->>>>>>> e3232dd (SYNFTIU: use SYNWD graph root when present; normalize encounter keys for notes)
  q:encien="" ""
  n nroot s nroot=$na(@groot@("load","encounters",encien,"note"))
  q nroot
