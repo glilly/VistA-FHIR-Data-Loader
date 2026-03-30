@@ -82,7 +82,7 @@ wsIntakeCareplan(args,body,result,ien)        ; web service entry (post)
  . ;
  . ; see if this resource has already been loaded. if so, skip it
  . ;
- . if $g(ien)'="" if $$loadStatus("condition",zi,ien)=1 do  quit  ;
+ . if $g(ien)'="" if $$loadStatus("careplan",zi,ien)=1 do  quit  ;
  . . d log(jlog,"CarePlan already loaded, skipping")
  . ;
  . ; determine CarePlan snomed code, coding system, and display text
