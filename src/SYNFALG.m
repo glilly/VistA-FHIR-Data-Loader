@@ -144,6 +144,17 @@ wsIntakeAllergy(args,body,result,ien) ; web service entry (post)
  . n algy s algy=$$ISGMR(sctcode)
  . i algy'=-1 s ISIMISC("ALLERGEN")=$p(algy,"^",2)
  . i ISIMISC("ALLERGEN")="" s ISIMISC("ALLERGEN")=algDisp
+ . i ISIMISC("ALLERGEN")="" s ISIMISC("ALLERGEN")=$g(json("entry",zi,"resource","code","text"))
+ . i ISIMISC("ALLERGEN")="" s ISIMISC("ALLERGEN")=$g(json("entry",zi,"resource","reaction",1,"substance","coding",1,"display"))
+ . i ISIMISC("ALLERGEN")="" s ISIMISC("ALLERGEN")=$g(json("entry",zi,"resource","reaction",1,"substance","coding",1,"code"))
+ . i ISIMISC("ALLERGEN")="" n ci,cdp,cd s ci=0
+ . i ISIMISC("ALLERGEN")="" f ci=1:1:20 q:ISIMISC("ALLERGEN")'=""  d
+ . . s cdp=$g(json("entry",zi,"resource","code","coding",ci,"display"))
+ . . i cdp'="" s ISIMISC("ALLERGEN")=cdp q
+ . . s cd=$g(json("entry",zi,"resource","code","coding",ci,"code"))
+ . . i cd'="" s ISIMISC("ALLERGEN")=cd
+ . i ISIMISC("ALLERGEN")="",sctcode'="" s ISIMISC("ALLERGEN")="SNOMED "_sctcode
+ . i ISIMISC("ALLERGEN")="" s ISIMISC("ALLERGEN")="Unknown allergen"
  . s eval("allergy",zi,"parms","ALLERGEN")=ISIMISC("ALLERGEN")
  . ;
  . s ISIMISC("SYMPTOM")=$get(json("entry",zi,"resource","reaction",1,"description"))
