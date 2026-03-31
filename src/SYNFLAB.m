@@ -20,6 +20,15 @@ SYNFLAB ;ven/gpl - fhir loader utilities ;2018-05-08  4:23 PM
  ;
 importLabs(rtn,ien,args) ; entry point for loading labs for a patient
  ; calls the intake Labs web service directly
+ ; Panels are ingested inside wsIntakeLabs — skipped together with labs.
+ ; Skip when args("skipLabs")=1, or site flag ^SYN("FHIR","SKIP_LABS")=1 (args skipLabs=0 forces run).
+ i $$SKPLAB^SYNFLAB(.args) d  q
+ . s rtn("labsStatus","status")="skipped"
+ . s rtn("labsStatus","loaded")=0
+ . s rtn("labsStatus","errors")=0
+ . s rtn("panelsStatus","status")="skipped"
+ . s rtn("panelsStatus","loaded")=0
+ . s rtn("panelsStatus","errors")=0
  ;
  n grtn
  n root s root=$$setroot^SYNWD("fhir-intake")
@@ -35,6 +44,12 @@ importLabs(rtn,ien,args) ; entry point for loading labs for a patient
  s rtn("panelsStatus","loaded")=grtn("panelStatus","loaded")
  s rtn("panelsStatus","errors")=grtn("panelStatus","errors")
  q
+ ;
+SKPLAB(args) ; extrinsic: 1 = skip labs and panels for this intake
+ i $g(args("skipLabs"))=1 q 1
+ i $g(args("skipLabs"))=0 q 0
+ i $g(^SYN("FHIR","SKIP_LABS"))=1 q 1
+ q 0
  ;
 wsIntakeLabs(args,body,result,ien) ; web service entry (post)
  ; for intake of one or more Lab results. input are fhir resources
