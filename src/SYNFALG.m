@@ -139,9 +139,11 @@ wsIntakeAllergy(args,body,result,ien) ; web service entry (post)
  .;
  . n RESTA,ISIMISC
  . ;
- . s ISIMISC("ALLERGEN")=$get(json("entry",zi,"resource","code","coding",1,"display"))
+ . n algDisp s algDisp=$get(json("entry",zi,"resource","code","coding",1,"display"))
+ . s ISIMISC("ALLERGEN")=algDisp
  . n algy s algy=$$ISGMR(sctcode)
  . i algy'=-1 s ISIMISC("ALLERGEN")=$p(algy,"^",2)
+ . i ISIMISC("ALLERGEN")="" s ISIMISC("ALLERGEN")=algDisp
  . s eval("allergy",zi,"parms","ALLERGEN")=ISIMISC("ALLERGEN")
  . ;
  . s ISIMISC("SYMPTOM")=$get(json("entry",zi,"resource","reaction",1,"description"))
