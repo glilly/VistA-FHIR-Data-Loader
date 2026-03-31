@@ -123,6 +123,8 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . ; determine the effective date
  . ;
  . new effdate set effdate=$get(@json@("entry",zi,"resource","period","start"))
+ . i effdate="" s effdate=$get(@json@("entry",zi,"resource","period","end"))
+ . i effdate="" s effdate=$get(@json@("entry",zi,"resource","meta","lastUpdated"))
  . do log(jlog,"effectiveDateTime is: "_effdate)
  . set @eval@("encounters",zi,"vars","effectiveDateTime")=effdate
  . new fmtime s fmtime=$$fhirTfm^SYNFUTL(effdate)
@@ -205,8 +207,12 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . . i ien="" q  ;
  . . if $$loadStatus("encounters",zi,ien)=1 do  quit  ;
  . . . d log(jlog,"Encounter already loaded, skipping")
- . . d log(jlog,"Calling ENCTUPD^SYNDHP61 data loader to add encounter")
- . . d ENCTUPD^SYNDHP61(.RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT)        ;Encounter update
+ . . i hl7time="" d
+ . . . s RETSTA="-1^Missing encounter visit date (period.start/end)"
+ . . . d log(jlog,"Skipping ENCTUPD: no HL7 start date")
+ . . e  d
+ . . . d log(jlog,"Calling ENCTUPD^SYNDHP61 data loader to add encounter")
+ . . . d ENCTUPD^SYNDHP61(.RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT)        ;Encounter update
  . . d log(jlog,"Return from data loader was: "_$g(RETSTA))
  . . ;
  . . m @eval@("encounters",zi,"status","return")=RETSTA

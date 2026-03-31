@@ -79,12 +79,21 @@ clearIndexes    ; do this carefully
 FHIRISO2HL7(dtin) ; extrinsic: YYYYMMDDHHMMSS for XLFDT / HL7 (ISO 8601 subset)
  ; Handles date YYYY-MM-DD, optional T time, optional .fff fractional seconds,
  ; trailing Z, +hh:mm offset, or -hh:mm after the time (not date dashes).
+ ; Also compact HL7-style (no T, no ISO dashes): 8=YYYYMMDD, 12=YYYYMMDDHHMM, 14=YYYYMMDDHHMMSS.
+ ; PCE/ENCTUPD use $$HL7TFM^XLFDT on this; bad input -> FM -1 -> "not a valid FileMan date and time".
  n in,d,t,ds,hms,j,done
  s in=$g(dtin) q:in="" ""
  i $l(in),(($e(in,$l(in))="Z")!($e(in,$l(in))="z")) s in=$e(in,1,$l(in)-1)
+ ; Numeric compact forms (avoid treating as YYYY-MM-DD — $e slices would be wrong)
+ i in'["-",in'["T" d  q
+ . i in?8N q in_"000000"
+ . i in?12N q in_"00"
+ . i in?14N q in
+ . q ""
  s d=$p(in,"T",1)
  s t=$p(in,"T",2)
  q:d="" ""
+ ; YYYY-MM-DD segment must be at least 10 chars
  i $l(d)<10 q ""
  s ds=$e(d,1,4)_$e(d,6,7)_$e(d,9,10)
  q:ds'?8N ""
