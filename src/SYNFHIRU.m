@@ -30,16 +30,17 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  set root=$$setroot^SYNWD("fhir-intake")
  set id=$get(ARGS("id"))
  ;
- ; first locate the patient to be updated
+ ; Locate graph row ien: query ien=, dfn= (VistA DFN on file), icn= / id= (full ICN string)
  ;
- n icn s icn=$g(ARGS("icn"))
- i (icn="")&(id="") d  q 0 ; set http error to bad request
- . s HTTPERR=400 ; bad request
- s ien=$o(@root@("POS","ICN",icn,""))
- i ien="" d  ; try id
- . s ien=$o(@root@("POS","ICN",id,"")) ; ok to use id instead of icn
- . i ien'="" s icn=id
- i ien="" d  q 0 ; icn not found
+ n icn,had,dnx
+ s had=0
+ s ien=+$g(ARGS("ien")) i ien>0 s had=1
+ i ien<1 s dnx=+$g(ARGS("dfn")) i dnx>0 s had=1,ien=$$dfn2ien^SYNFUTL(dnx)
+ s icn=$g(ARGS("icn")) i icn="" s icn=$g(ARGS("id"))
+ i ien<1,icn'="" s had=1,ien=$o(@root@("POS","ICN",icn,""))
+ i ien<1 d  q 0
+ . s HTTPERR=$s($g(had):404,1:400)
+ i '$d(@root@(ien,"json","entry")) d  q 0
  . s HTTPERR=404
  ;
  merge json=BODY
@@ -49,9 +50,12 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  n gr1,zi,cnt,rien ; initial entries
  do DECODE^XLFJSON("json","gr1")
  ;
+ ; start from existing graph row so indexes/json are not truncated to the delta only
+ m gr(ien)=@root@(ien)
+ ;
  ; shift resource numbers to fit in graph
  ;
- n lastrien s lastrien=$o(@root@(ien,"json","entry"," "),-1)
+ n lastrien s lastrien=$o(gr(ien,"json","entry"," "),-1)
  s zi=0 s cnt=0
  f  s zi=$o(gr1("entry",zi)) q:+zi=0  d  ;
  . s cnt=cnt+1
@@ -65,6 +69,9 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  if $get(ARGS("returngraph"))=1 do  ;
  . merge return("graph")=gr
  set return("status")="ok"
+ i icn="" d
+ . n dfr s dfr=$o(@root@("SPO",ien,"DFN",""))
+ . i dfr'="" s icn=$$dfn2icn^SYNFUTL(dfr)
  set return("icn")=icn
  set return("ien")=ien
  n bundle s bundle=$$bundleId($na(gr(ien)))
@@ -72,8 +79,8 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  set ARGS("bundle")=bundle ; ingest only resources in this bundle
  s SYNBUNDLE=bundle
  ;
- ; commit the bundle to the graph
- m @root=gr
+ ; commit merged json subtree for this graph ien only
+ m @root@(ien)=gr(ien)
  ;
  new rdfn set rdfn=$o(@root@("SPO",ien,"DFN",""))
  if rdfn'="" set @root@("DFN",rdfn,ien)=""

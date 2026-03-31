@@ -150,7 +150,7 @@ importPatient(rtn,ien) ; register and import a fhir patient (demographics only)
  ;
  ; load successful
  ;
- new icn set icn=$$newIcn2(zdfn,pid)
+ new icn set icn=$$newIcn2(zdfn,pid,ien,$g(@parms@("SSN")))
  if icn'=-1 s @PLD("status")@("ICN")=icn
  s @PLD("status")@("DFN")=zdfn
  s @PLD("status")@("loadStatus")="loaded"
@@ -320,6 +320,26 @@ patssn(fary) ; extrinsic returns the ssn of the patient extracted from
  ;G("ZIP_4")="FIELD|.1112"
  ;G("ZIP_4_MASK")="MASK|.1112
  ;"
+applyMpiIcn(dfn,tmpicn) ; file 991.xx + ^DPT("AFICN") + graph ICN index; returns full ICN or -1
+ q:+tmpicn<1 -1
+ ;991.01    INTEGRATION CONTROL NUMBER (NJ12,0Xa), [MPI;1]
+ ;991.02    ICN CHECKSUM (Fa), [MPI;2]
+ ;991.1     FULL ICN (FXa), [MPI;10]
+ n fda,tchk,err,ficn
+ s tchk=$$CHECKDG^MPIFSPC(tmpicn)
+ s fda(2,dfn_",",991.01)=tmpicn
+ s fda(2,dfn_",",991.02)=tchk
+ s fda(2,dfn_",",991.1)=tmpicn_"V"_tchk
+ d UPDATE^DIE("","fda",,"err")
+ i $d(err) d  q -1
+ . D ^ZTER
+ s ficn=tmpicn_"V"_tchk
+ S ^DPT("AFICN",ficn,dfn)=""
+ S ^DPT("ARFICN",dfn,ficn)=""
+ n ien s ien=$$dfn2ien^SYNFUTL(dfn)
+ i ien'="" d setIndex^SYNFUTL(ien,"ICN",ficn)
+ q ficn
+ ;
 newIcn(dfn) ; extrinsic which creates a new ICN for the patient
  ; if none exists. returns the ICN
  ;
@@ -333,28 +353,7 @@ newIcn(dfn) ; extrinsic which creates a new ICN for the patient
  ;
  set tmpicn=$o(^DPT("AICN",99999999999),-1)+1
  if tmpicn=1 s tmpicn=50000001 ; first ICN in the system
- ;
- ;991.01    INTEGRATION CONTROL NUMBER (NJ12,0Xa), [MPI;1]
- ;991.02    ICN CHECKSUM (Fa), [MPI;2]
- ;991.1     FULL ICN (FXa), [MPI;10]
- ;
- new fda,tchk
- set tchk=$$CHECKDG^MPIFSPC(tmpicn)
- set fda(2,dfn_",",991.01)=tmpicn
- set fda(2,dfn_",",991.02)=tchk
- set fda(2,dfn_",",991.1)=tmpicn_"V"_tchk
- do UPDATE^DIE("","fda",,"err")
- if $data(err) do  quit -1
- . D ^ZTER
- ;
- new ficn s ficn=tmpicn_"V"_tchk
- S ^DPT("AFICN",ficn,dfn)=""
- S ^DPT("ARFICN",dfn,ficn)=""
- ;
- n ien s ien=$$dfn2ien^SYNFUTL(dfn)
- if ien'="" do setIndex^SYNFUTL(ien,"ICN",ficn)
- ;
- quit ficn
+ q $$applyMpiIcn(dfn,tmpicn)
  ;
 icn(dfn) ; extrinsic returns the ICN of the patient
  ; returns -1 if none exists
@@ -365,40 +364,84 @@ icn(dfn) ; extrinsic returns the ICN of the patient
  ;
  quit zicn_"V"_$$CHECKDG^MPIFSPC(zicn)
  ;
-newIcn2(dfn,pid) ; extrinsic which creates a new ICN for the patient based on the Synthea patient id (pid)
- ; returns the ICN
+patientEntryZntry(ien) ; json entry subscript for the Patient resource in graph ien
+ n root,z
+ s root=$$setroot^SYNWD("fhir-intake")
+ s z=0
+ f  s z=$o(@root@(ien,"json","entry",z)) q:+z=0  i $g(@root@(ien,"json","entry",z,"resource","resourceType"))="Patient" q
+ i $g(@root@(ien,"json","entry",z,"resource","resourceType"))'="Patient" s z=0
+ q z
  ;
- i $g(pid)="" d  ; pid not provided.. go find it
- . n fien s fien=$$dfn2ien^SYNFUTL(dfn)
- . s pid=$$ien2pid^SYNFUTL(fien)
- i $g(pid)="" q -1
- new tmpicn
+syntheaPidFromGraph(ien,zntry) ; Synthea stable UUID string for pid2icn (any identifier slice)
+ n root,idx,sys,val,low
+ q:$g(zntry)<1 ""
+ s root=$$setroot^SYNWD("fhir-intake")
+ s val=""
+ f idx=1:1:99 q:'$d(@root@(ien,"json","entry",zntry,"resource","identifier",idx))  d  q:val'=""
+ . s low=$$LOW^XLFSTR($g(@root@(ien,"json","entry",zntry,"resource","identifier",idx,"system")))
+ . s val=$$TRIM^XLFSTR($g(@root@(ien,"json","entry",zntry,"resource","identifier",idx,"value")))
+ . q:val=""
+ . i low'["synthetichealth",low'["synthea" s val="" q
+ . i val'["-",val'["urn:uuid" s val="" q
+ q val
  ;
- s tmpicn=$$pid2icn^SYNFUTL(pid) ; generate the icn from the pid
+fhirIcnNumericBase(ien,zntry) ; 10-digit 991.01 from Patient.identifier if supplied (else -1)
+ n root,idx,sys,val,up,base,b
+ s base=-1
+ q:$g(zntry)<1 -1
+ s root=$$setroot^SYNWD("fhir-intake")
+ f idx=1:1:99 q:'$d(@root@(ien,"json","entry",zntry,"resource","identifier",idx))  d  q:base'=-1
+ . s up=$$UP^XLFSTR($g(@root@(ien,"json","entry",zntry,"resource","identifier",idx,"system")))
+ . s val=$$TRIM^XLFSTR($g(@root@(ien,"json","entry",zntry,"resource","identifier",idx,"value")))
+ . q:val=""
+ . i up'["ICN",up'["2.16.840.1.113883.4.349" q
+ . i val?10N s base=+val q
+ . i val'["V" q
+ . s b=$p(val,"V",1)
+ . i b?10N s base=+b q
+ q base
  ;
- ;991.01    INTEGRATION CONTROL NUMBER (NJ12,0Xa), [MPI;1]
- ;991.02    ICN CHECKSUM (Fa), [MPI;2]
- ;991.1     FULL ICN (FXa), [MPI;10]
+ssnFromPatientGraph(ien,zntry) ; digits-only SSN from Patient.identifier (us-ssn), for genAllIcns
+ n root,j,sys,val,out
+ s out=""
+ q:$g(zntry)<1 ""
+ s root=$$setroot^SYNWD("fhir-intake")
+ s j="" f  s j=$o(@root@(ien,"json","entry",zntry,"resource","identifier",j)) q:j=""  d
+ . s sys=$g(@root@(ien,"json","entry",zntry,"resource","identifier",j,"system"))
+ . s val=$$TRIM^XLFSTR($g(@root@(ien,"json","entry",zntry,"resource","identifier",j,"value")))
+ . i sys'["us-ssn" q
+ . i val["-" s val=$tr(val,"-","")
+ . s out=val
+ . g ssnout
+ q out
+ssnout q out
  ;
- new fda,tchk,err
- set tchk=$$CHECKDG^MPIFSPC(tmpicn)
- i +dfn=0 b
- set fda(2,dfn_",",991.01)=tmpicn
- set fda(2,dfn_",",991.02)=tchk
- set fda(2,dfn_",",991.1)=tmpicn_"V"_tchk
- do UPDATE^DIE("","fda",,"err")
- if $data(err) do  quit -1
- . D ^ZTER
- . zwrite err
- ;
- new ficn s ficn=tmpicn_"V"_tchk
- S ^DPT("AFICN",ficn,dfn)=""
- S ^DPT("ARFICN",dfn,ficn)=""
- ;
- n ien s ien=$$dfn2ien^SYNFUTL(dfn)
- if ien'="" do setIndex^SYNFUTL(ien,"ICN",ficn)
- ;
- quit ficn
+newIcn2(dfn,pid,ien,ssn) ; assign ICN: existing MPI, Synthea UUID, FHIR ICN, SSN pseudo, else sequential
+ ; ien = fhir-intake graph ien (optional); ssn = normalized digits from parms (optional)
+ n tmpicn,ex,zntry,spid,b9
+ s ex=$$icn(dfn)
+ i ex'=-1 d  q ex
+ . n ix s ix=$$dfn2ien^SYNFUTL(dfn)
+ . i ix'="" d setIndex^SYNFUTL(ix,"ICN",ex)
+ s tmpicn=-1
+ i $g(pid)'="" s tmpicn=$$pid2icn^SYNFUTL(pid)
+ s zntry=$s(+$g(ien)>0:$$patientEntryZntry(ien),1:0)
+ i tmpicn=-1,zntry>0 d
+ . s spid=$$syntheaPidFromGraph(ien,zntry)
+ . i spid'="" s tmpicn=$$pid2icn^SYNFUTL(spid)
+ i tmpicn=-1,zntry>0 d
+ . s b9=$$fhirIcnNumericBase(ien,zntry)
+ . i b9'=-1,b9>0 s tmpicn=b9
+ i tmpicn=-1,$g(ssn)'="" d
+ . s b9=$$ssn2icnBase^SYNFUTL(ssn)
+ . i b9'="" s tmpicn=+b9
+ i tmpicn=-1 d  ; graph pid (fullUrl) last resort before sequential
+ . i $g(pid)="" d
+ . . n fi s fi=$$dfn2ien^SYNFUTL(dfn)
+ . . s pid=$$ien2pid^SYNFUTL(fi)
+ . i pid'="" s tmpicn=$$pid2icn^SYNFUTL(pid)
+ i tmpicn=-1 q $$newIcn(dfn)
+ q $$applyMpiIcn(dfn,tmpicn)
  ;
 fixindex1 ; create the ICN and DFN indexes
  d clearIndexes^SYNFUTL ; blow away the indexes
@@ -446,8 +489,9 @@ genAllIcns ; regenerates all ICNs; insterts in PATIENT file and regenerates inde
  . s pid=$$ien2pid^SYNFUTL(zi)
  . s dfn=$$ien2dfn^SYNFUTL(zi)
  . i dfn<1 q
- . i pid="" q
- . s icn=$$newIcn2^SYNFPAT(dfn,pid)
+ . n ztr s ztr=$$patientEntryZntry^SYNFPAT(zi)
+ . n gssn s gssn=$$ssnFromPatientGraph^SYNFPAT(zi,ztr)
+ . s icn=$$newIcn2^SYNFPAT(dfn,pid,zi,gssn)
  . w !,"fien: "_zi_" dfn: "_dfn_" pid: "_pid_" icn: "_icn
  d fixicn1 ; fix ^DPT indexes
  d fixindex1 ; fix graph indexes

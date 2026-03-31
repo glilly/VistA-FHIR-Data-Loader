@@ -210,6 +210,16 @@ pid2icn(pid) ; generate an ICN from a pid
  s dpid=$e(dpid,1,10) ; icn is the first 10 decimal digits
  q dpid
  ;
+ssn2icnBase(ssn) ; 10-digit MPI base (991.01) from SSN — deterministic across sites
+ ; When no Synthea UUID and no supplied ICN, prefix 8 + nine-digit SSN (pseudo-ICN).
+ ; CHECKDG^MPIFSPC is applied when filing; same SSN => same base => same full ICN everywhere.
+ n d
+ s d=$$TRIM^XLFSTR($g(ssn))
+ i d="" q ""
+ i d["-" s d=$tr(d,"-","")
+ q:d'?9N ""
+ q "8"_d
+ ;
 testIcnGen(fien) ; extrinsic generates an ICN for fhir patient fien
  n pid s pid=$$ien2pid(fien)
  n icn s icn=$$pid2icn(pid)
