@@ -100,6 +100,8 @@ wsIntakeAllergy(args,body,result,ien) ; web service entry (post)
  . ;d log(jlog,"ID is: "_id)
  . ;
  . new sctcode set sctcode=$get(json("entry",zi,"resource","code","coding",1,"code"))
+ . ; VA payloads may use FileMan ptr e.g. 125;GMRD(120.82, — use IEN for GMR lookup
+ . i sctcode[";" s sctcode=$p(sctcode,";",1)
  . do log(jlog,"code is: "_sctcode)
  . set eval("allergy",zi,"vars","code")=sctcode
  . ;

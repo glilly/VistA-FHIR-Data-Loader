@@ -76,22 +76,43 @@ clearIndexes    ; do this carefully
  k @gn@("OPS")
  q
  ;
-fhirTfm(dtin)   ; extrinsic which returns the fileman dateTime
- ; for the FHIR format input ie 2017-04-28T01:28:28-04:00
- n tdt
- s tdt=$tr(dtin,":")
- s tdt=$tr(tdt,"T")
- s tdt=$e(tdt,1,4)_$e(tdt,6,7)_$e(tdt,9,21)
- q $$HL7TFM^XLFDT(tdt)
+FHIRISO2HL7(dtin) ; extrinsic: YYYYMMDDHHMMSS for XLFDT / HL7 (ISO 8601 subset)
+ ; Handles date YYYY-MM-DD, optional T time, optional .fff fractional seconds,
+ ; trailing Z, +hh:mm offset, or -hh:mm after the time (not date dashes).
+ n in,d,t,ds,hms,j,done
+ s in=$g(dtin) q:in="" ""
+ i $l(in),(($e(in,$l(in))="Z")!($e(in,$l(in))="z")) s in=$e(in,1,$l(in)-1)
+ s d=$p(in,"T",1)
+ s t=$p(in,"T",2)
+ q:d="" ""
+ i $l(d)<10 q ""
+ s ds=$e(d,1,4)_$e(d,6,7)_$e(d,9,10)
+ q:ds'?8N ""
+ s hms="000000"
+ i t'="" d
+ . i t["." s t=$p(t,".",1)
+ . i t["+" s t=$p(t,"+",1)
+ . e  d
+ . . s done=0
+ . . f j=1:1:$l(t) q:done  i $e(t,j)="-" d
+ . . . i j>8,$e(t,j+1)?1N,$e(t,j+2)?1N,$e(t,j+3)=":" s t=$e(t,1,j-1),done=1
+ . s hms=$tr(t,":","")
+ . q:hms=""
+ . i hms'?1.12N s hms="000000" q
+ . i $l(hms)=4 s hms=hms_"00"
+ . i $l(hms)=2 s hms=hms_"0000"
+ . i $l(hms)>6 s hms=$e(hms,1,6)
+ q ds_hms
  ;
-fhirThl7(dtin)  ; extrinsic which returns the HL7 dateTime
- ; for the FHIR format input ie 2017-04-28T01:28:28-04:00
- ; example hl7 returned: 20170428012828-0400
- n tdt
- s tdt=$tr(dtin,":")
- s tdt=$tr(tdt,"T")
- s tdt=$e(tdt,1,4)_$e(tdt,6,7)_$e(tdt,9,21)
- q tdt
+fhirTfm(dtin)   ; extrinsic which returns the fileman dateTime
+ ; FHIR instant e.g. 2017-06-09T14:19:00Z or 2017-04-28T01:28:28-04:00
+ n ts s ts=$$FHIRISO2HL7^SYNFUTL(dtin)
+ q:ts="" -1
+ q $$HL7TFM^XLFDT(ts)
+ ;
+fhirThl7(dtin)  ; extrinsic which returns the HL7 dateTime (compact, no Z)
+ ; Same inputs as fhirTfm; returns YYYYMMDDHHMMSS for DHP* HL7 fields
+ q $$FHIRISO2HL7^SYNFUTL(dtin)
  ;
 ien2dfn(ien)    ; extrinsic returns the patient DFN given the graph ien
  n root s root=$$setroot^SYNWD("fhir-intake")
