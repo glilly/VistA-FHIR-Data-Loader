@@ -28,12 +28,26 @@ importPanels(rtn,ien,args) ; entry point for loading lab panels for a patient
  ;. m @root@(ien,"load","panels")=grtn("panels")
  ;. if $g(args("debug"))=1 m rtn=grtn
  if $g(args("debug"))=1 m rtn=grtn
- s rtn("panelStatus","status")=grtn("status","status")
- s rtn("panelStatus","loaded")=grtn("status","loaded")
- s rtn("panelStatus","errors")=grtn("status","errors")
+ s rtn("panelStatus","status")=$g(grtn("status","status"),"unknown")
+ s rtn("panelStatus","loaded")=+$g(grtn("status","loaded"))
+ s rtn("panelStatus","errors")=+$g(grtn("status","errors"))
  ;b
  ;
  ;
+ q
+ ;
+PNOUT(rtn,jrslt,eval,st,ldov,erov) ; set rtn("status",*) for wsIntakePanels (all exit paths)
+ ; st=ok|skipped|error; ldov/erov optional numeric overrides ("" = from eval panels counters)
+ n ld,er
+ s ld=$s($g(ldov)'="":+ldov,$g(eval)'="":+$g(@eval@("panels","status","loaded")),1:0)
+ s er=$s($g(erov)'="":+erov,$g(eval)'="":+$g(@eval@("panels","status","errors")),1:0)
+ k jrslt("result")
+ i $g(eval)'="",$d(@eval@("labsStatus")) m jrslt("labsStatus")=@eval@("labsStatus")
+ e  k jrslt("labsStatus")
+ s jrslt("result","status")=$g(st,"ok")
+ s jrslt("result","loaded")=ld
+ s jrslt("result","errors")=er
+ m rtn("status")=jrslt("result")
  q
  ;
 wsIntakePanels(args,body,result,ien) ; web service entry (post)
@@ -46,6 +60,7 @@ wsIntakePanels(args,body,result,ien) ; web service entry (post)
  s root=$$setroot^SYNWD("fhir-intake")
  ;
  n jtmp,json,jrslt,eval
+ s (troot,eval)=""
  ;i $g(ien)'="" if $$loadStatus("panels","",ien)=1 d  q  ;
  ;. s result("labsStatus","status")="alreadyLoaded"
  i $g(ien)'="" d  ; internal call
@@ -57,11 +72,11 @@ wsIntakePanels(args,body,result,ien) ; web service entry (post)
  ;   this is for the use case when we are processing an update to
  ;   the patient rather than the initial load
  ;
- i '$d(@troot) q 0  ;
+ i $g(ien)="" d PNOUT^SYNFPAN(.result,.jrslt,"","skipped",0,0) q 0
+ i '$d(@troot) d PNOUT^SYNFPAN(.result,.jrslt,.eval,"skipped",0,0) q 0
  s json=$na(@root@(ien,"json"))
  ;
- ; Initialize counters
- s result("status","status")="NotStarted"
+ ; Initialize panel counters on graph load node
  s @eval@("panels","status","errors")=0
  s @eval@("panels","status","loaded")=0
  ;
@@ -75,8 +90,9 @@ wsIntakePanels(args,body,result,ien) ; web service entry (post)
  . i dfn="" d  ;
  . . n icn s icn=$g(args("icn"))
  . . i icn'="" s dfn=$$icn2dfn^SYNFUTL(icn)
- i $g(dfn)="" do  quit 0  ; need the patient
+ i $g(dfn)="" d  q 0  ; need the patient
  . s result("panels",1,"log",1)="Error, patient not found.. terminating"
+ . d PNOUT^SYNFPAN(.result,.jrslt,.eval,"error",0,0)
  ;
  ;
  new SYNZI s SYNZI=0
@@ -240,11 +256,7 @@ wsIntakePanels(args,body,result,ien) ; web service entry (post)
  . m jrslt("source")=@json
  . m jrslt("args")=args
  . m jrslt("eval")=@eval
- m jrslt("labsStatus")=@eval@("labsStatus")
- set jrslt("result","status")="ok"
- set jrslt("result","loaded")=@eval@("panels","status","loaded")
- set jrslt("result","errors")=@eval@("panels","status","errors")
- m result("status")=jrslt("result")
+ d PNOUT^SYNFPAN(.result,.jrslt,.eval,"ok",,)
  q:$Q 0 Q
  ;
 SUCCESS(SYNZI,success,eval,ien) ; after a panel has loaded, mark the successful lab tests as loaded
