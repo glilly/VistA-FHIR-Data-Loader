@@ -66,8 +66,6 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  do indexFhir(ien,"gr")
  ;
  ;
- if $get(ARGS("returngraph"))=1 do  ;
- . merge return("graph")=gr
  set return("status")="ok"
  i icn="" d
  . n dfr s dfr=$o(@root@("SPO",ien,"DFN",""))
@@ -88,16 +86,20 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  if rdfn'="" do  ; patient creation was successful
  . if $g(ARGS("load"))="" s ARGS("load")=1
  . ;do taskLabs(.return,ien,.ARGS)
- . DO importLabs^SYNFLAB(.return,ien,.ARGS)
- . do importVitals^SYNFVIT(.return,ien,.ARGS)
- . do importEncounters^SYNFENC(.return,ien,.ARGS)
- . do importImmu^SYNFIMM(.return,ien,.ARGS)
- . do importConditions^SYNFPR2(.return,ien,.ARGS)
- . do importAllergy^SYNFALG(.return,ien,.ARGS)
- . do importAppointment^SYNFAPT(.return,ien,.ARGS)
- . do importMeds^SYNFMED2(.return,ien,.ARGS)
- . do importProcedures^SYNFPROC(.return,ien,.ARGS)
- . do importCarePlan^SYNFCP(.return,ien,.ARGS)
+ . n X
+ . s X="importLabs^SYNFLAB(.return,ien,.ARGS)" d @X
+ . s X="importVitals^SYNFVIT(.return,ien,.ARGS)" d @X
+ . s X="importEncounters^SYNFENC(.return,ien,.ARGS)" d @X
+ . s X="importImmu^SYNFIMM(.return,ien,.ARGS)" d @X
+ . s X="importConditions^SYNFPR2(.return,ien,.ARGS)" d @X
+ . s X="importAllergy^SYNFALG(.return,ien,.ARGS)" d @X
+ . s X="importAppointment^SYNFAPT(.return,ien,.ARGS)" d @X
+ . s X="importMeds^SYNFMED2(.return,ien,.ARGS)" d @X
+ . s X="importProcedures^SYNFPROC(.return,ien,.ARGS)" d @X
+ . s X="importCarePlan^SYNFCP(.return,ien,.ARGS)" d @X
+ ;
+ if $get(ARGS("returngraph"))=1 do  ;
+ . do transactionLoad(.return,ien,lastrien+1,lastrien+cnt)
  ;
  k SYNBUNDLE
  do ENCODE^XLFJSON("return","RESULT")
@@ -260,6 +262,22 @@ loadStatus(ary,ien,rien) ; returns the "load" section of the patient graph
  f  s zi=$o(@root@(ien,"load",zi)) q:$d(@root@(ien,"load",zi,rien))
  k @ary
  m @ary@(ien,rien)=@root@(ien,"load",zi,rien)
+ q
+ ;
+transactionLoad(return,ien,first,last) ; return load nodes for appended transaction entries
+ n root s root=$$setroot^SYNWD("fhir-intake")
+ n rien,domain
+ s return("transaction","firstEntry")=first
+ s return("transaction","lastEntry")=last
+ s return("transaction","entryCount")=$s(last'<first:last-first+1,1:0)
+ s rien=first-1
+ f  s rien=$o(@root@(ien,"json","entry",rien)) q:+rien=0!(rien>last)  d  ;
+ . n type s type=$g(@root@(ien,"json","entry",rien,"resource","resourceType"))
+ . s return("transaction","entries",rien,"resourceType")=type
+ . s domain=""
+ . f  s domain=$o(@root@(ien,"load",domain)) q:domain=""  d  ;
+ . . i '$d(@root@(ien,"load",domain,rien)) q
+ . . m return("transactionLoad",rien,domain)=@root@(ien,"load",domain,rien)
  q
  ;
 wsLoadStatus(rtn,filter) ; displays the load status
