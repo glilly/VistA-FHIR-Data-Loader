@@ -20,7 +20,7 @@ SYNFLAB ;ven/gpl - fhir loader utilities ;2018-05-08  4:23 PM
  ;
 importLabs(rtn,ien,args) ; entry point for loading labs for a patient
  ; calls the intake Labs web service directly
- ; Panels are ingested inside wsIntakeLabs — skipped together with labs.
+ ; Panels are ingested inside wsIntakeLabs - skipped together with labs.
  ; Skip when args("skipLabs")=1, or site flag ^SYN("FHIR","SKIP_LABS")=1 (args skipLabs=0 forces run).
  i $$SKPLAB^SYNFLAB(.args) d  q
  . s rtn("labsStatus","status")="skipped"
@@ -288,7 +288,7 @@ wsIntakeLabs(args,body,result,ien) ; web service entry (post)
  . . ;LABADD(RETSTA,DHPPAT,DHPLOC,DHPTEST,DHPRSLT,DHPRSDT,DHPLOINC,DHPCSAMP)
  . . D LABADD^SYNDHP63(.RETSTA,DHPPAT,DHPLOC,DHPLAB,DHPOBS,DHPDTM,DHPLOINC,$G(CSAMP))
  . . d log(jlog,"Return from LABADD^ZZDHP63 was: "_$g(RETSTA))
- . . i $g(DEBUG)=1 ZWRITE RETSTA
+ . . ; DEBUG dump intentionally omitted for XINDEX compatibility.
  . . n retmsg s retmsg=$g(RETSTA)
  . . i +retmsg=1 d  q  ;
  . . . s @eval@("labs","status","loaded")=$g(@eval@("labs","status","loaded"))+1

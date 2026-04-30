@@ -291,7 +291,7 @@ SETUP ; set data for $$DATA2PCE call
  ;
  ; -------- Encounter update
  ;
-DXICDCS(SYS) ; FHIR CodeableConcept system → ICDEX coding system: 1=ICD-9, 30=ICD-10, 0=SNOMED path
+DXICDCS(SYS) ; FHIR CodeableConcept system to ICDEX coding system: 1=ICD-9, 30=ICD-10, 0=SNOMED path
  ; Used when Encounter.reasonCode is already ICD-9/10 (not SNOMED).
  Q:$G(SYS)="" 0
  I SYS["snomed.info" Q 0
@@ -305,7 +305,7 @@ DXICDCS(SYS) ; FHIR CodeableConcept system → ICDEX coding system: 1=ICD-9, 30=
  Q 0
  ;
 ENCTUPD(RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT,DXICDCS) ;Encounter update
- ; DXICDCS optional: 1 or 30 = SCTDX is ICD-9/ICD-10 text (FileMan ICDEX); 0/omit = SNOMED → ^SYN map
+ ; DXICDCS optional: 1 or 30 = SCTDX is ICD-9/ICD-10 text (FileMan ICDEX); 0/omit = SNOMED to ^SYN map
  ;return visit id/ien
  ;
  S U="^"
