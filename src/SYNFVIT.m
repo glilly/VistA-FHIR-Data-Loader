@@ -262,6 +262,8 @@ loinc2sct(loinc) ; extrinsic returns a Snomed code for a Loinc code
  ; thanks to Ferdi for the Snomed mapping
  ;
  ;
+ n SCTA
+ i $g(loinc)="" q ""
  S SCTA("29463-7",27113001)="9^Body weight"
  S SCTA("8302-2",50373000)="8^Body height"
  S SCTA("55284-4",75367002)="1^Blood pressure"
