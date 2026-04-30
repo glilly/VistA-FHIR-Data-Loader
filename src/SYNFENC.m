@@ -130,6 +130,11 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . new fmtime s fmtime=$$fhirTfm^SYNFUTL(effdate)
  . d log(jlog,"fileman dateTime is: "_fmtime)
  . set @eval@("encounters",zi,"vars","fmDateTime")=fmtime ;
+ . ; 1=ICD-9, 30=ICD-10, 0=SNOMED (ENCTUPD uses ^SYN map); heuristic uses encounter date
+ . new dxIcdCs s dxIcdCs=$$DXICDCS^SYNDHP61(reasoncdsys)
+ . i dxIcdCs=0,reasoncode'="",reasoncdsys="",reasoncode["." s dxIcdCs=$select(fmtime<3151001:1,1:30)
+ . d log(jlog,"reason DX ICDEX cs (0=SNOMED): "_dxIcdCs)
+ . set @eval@("encounters",zi,"vars","dxIcdCs")=dxIcdCs
  . new hl7time s hl7time=$$fhirThl7^SYNFUTL(effdate)
  . d log(jlog,"hl7 dateTime is: "_hl7time)
  . set @eval@("encounters",zi,"vars","hl7DateTime")=hl7time ;
@@ -176,17 +181,24 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . s notmapped=0
  . ;i sctcode'="" q:'$d(^BSTS)  d
  . i sctcode'=""  d  ;
- . . i fmtime<3151001 s icdcodetype="icd9"
- . . e  s icdcodetype="icd10"
- . . d log(jlog,"icd code type is: "_icdcodetype)
- . . i icdcodetype="icd9" s icdcode=$$MAP^SYNDHPMP("sct2icdnine",sctcode)
- . . e  s icdcode=$$MAP^SYNDHPMP("sct2icd",sctcode)
- . . i +icdcode=-1 s notmapped=1
- . . d:notmapped MAPERR^SYNQLDM(sctcode,icdcodetype)
- . . do log(jlog,"icd mapping is: "_icdcode)
- . . do:notmapped log(jlog,"snomed code "_sctcode_" is not mapped")
+ . . i dxIcdCs=1!(dxIcdCs=30) d  ;
+ . . . n icdtx s icdtx=$$ICDDX^ICDEX(sctcode,dxIcdCs)
+ . . . s icdcode=+icdtx
+ . . . i icdcode=-1 s notmapped=1
+ . . . d log(jlog,"direct ICD lookup ("_dxIcdCs_") is: "_icdcode)
+ . . e  d  ;
+ . . . i fmtime<3151001 s icdcodetype="icd9"
+ . . . e  s icdcodetype="icd10"
+ . . . d log(jlog,"icd code type is: "_icdcodetype)
+ . . . i icdcodetype="icd9" s icdcode=$$MAP^SYNDHPMP("sct2icdnine",sctcode)
+ . . . e  s icdcode=$$MAP^SYNDHPMP("sct2icd",sctcode)
+ . . . i +icdcode=-1 s notmapped=1
+ . . . d:notmapped MAPERR^SYNQLDM(sctcode,icdcodetype)
+ . . . do log(jlog,"icd mapping is: "_icdcode)
+ . . . do:notmapped log(jlog,"snomed code "_sctcode_" is not mapped")
  . . set @eval@("conditions",zi,"vars","mappedIcdCode")=icdcode
  . s @eval@("encounters",zi,"parms","SCTDX")=SCTDX
+ . s @eval@("encounters",zi,"parms","DXICDCS")=dxIcdCs
  . ;
  . s ENCPROV=$$MAP^SYNQLDM("OP","provider") ; map should return the NPI number
  . ;n DHPPROVIEN s DHPPROVIEN=$o(^VA(200,"B",ENCPROV,"")) ; this has to be the NPI number
@@ -212,9 +224,11 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . . . d log(jlog,"Skipping ENCTUPD: no HL7 start date")
  . . e  d
  . . . d log(jlog,"Calling ENCTUPD^SYNDHP61 data loader to add encounter")
- . . . d ENCTUPD^SYNDHP61(.RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT)        ;Encounter update
+ . . . d ENCTUPD^SYNDHP61(.RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT,dxIcdCs)        ;Encounter update
  . . d log(jlog,"Return from data loader was: "_$g(RETSTA))
  . . ;
+ . . ; MERGE keeps destination subscripts not present in RETSTA — stale ENCDATA/DIERR from prior runs otherwise.
+ . . k @eval@("encounters",zi,"status","return")
  . . m @eval@("encounters",zi,"status","return")=RETSTA
  . . n visitIen s visitIen=$p(RETSTA,"^",2) ; returned visit ien
  . . i +visitIen>0 d
@@ -226,11 +240,12 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . . if +$g(RETSTA)=1 do  ;
  . . . s @eval@("encounters","status","loaded")=$g(@eval@("encounters","status","loaded"))+1
  . . . s @eval@("encounters",zi,"status","loadstatus")="loaded"
+ . . . s @eval@("encounters",zi,"status","loadMessage")=$g(RETSTA)
  . . else  d  ;
  . . . s @eval@("encounters","status","errors")=$g(@eval@("encounters","status","errors"))+1
  . . . s @eval@("encounters",zi,"status","loadstatus")="notLoaded"
  . . . s @eval@("encounters",zi,"status","loadMessage")=$g(RETSTA)
- . . ; Do not KILL/MERGE here: @eval@ is $na(@root@(ien,"load")); killing encounters,zi wipes the subtree we just built; merge from @eval@ is empty after KILL (SYNFALG uses eval() RHS which still loses data on some GT.M builds). Data already lives at @root@(ien,"load","encounters",zi).
+ . . ; Do not KILL encounters,zi here — only return was cleared above before merge. Data already lives at @root@(ien,"load","encounters",zi).
  . . ; FHIR Encounter.note -> fhir-intake graph (TONOTEZI) + visit-linked TIU (MAKE^TIUSRVP)
  . . i +$g(RETSTA)=1,+visitIen>0,$g(args("skipEncounterNotes"))'=1,$t(INGESTFHIR^SYNFTIU)'="" d  ;
  . . . d INGESTFHIR^SYNFTIU(ien,zi,id,dfn,visitIen,jlog,.json,.args)

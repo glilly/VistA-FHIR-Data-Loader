@@ -74,7 +74,8 @@ KILLNOTEZI(ien,zi) ; kill graph note for load,encounters,zi (by bundle entry ind
  q
  ;
 TONOTEZI(ien,zi,line) ; append one line to @fhir-intake@(ien,"load","encounters",zi,"note")
- n r,nroot,zi,tline
+ ; Do not N zi — zi is a parameter; NEW zi would clear it and break callers (INGESTFHIR).
+ n r,nroot,tline
  s r=$$INTROOT^SYNFTIU
  s nroot=$na(@r@(ien,"load","encounters",zi,"note"))
  q:'$l($g(line))
@@ -121,19 +122,19 @@ FHIRNOTE2TIU(dfn,vsit,txt,jlog) ; One Encounter.note -> MAKE^TIUSRVP (visit-link
  ;
 INGESTFHIR(ien,zi,encid,dfn,vsit,jlog,json,args) ; Encounter.note -> graph + TIU
  ; ien=graph store ien, zi=bundle entry index, encid=FHIR Encounter.id (unused; reserved)
- ; json: local array json("entry",zi,"resource","note",...)
+ ; json: $NA of decoded bundle root (same as wsIntakeEncounters); use @json@(...) like SYNFENC
  ; args("encounterGraphNotes") 0=skip graph (default 1)
  ; args("encounterTiu")        0=skip TIU   (default 1)
  n dograph,dotiu,ni,txt,sep
  s dograph=$s($g(args("encounterGraphNotes"))=0:0,1:1)
  s dotiu=$s($g(args("encounterTiu"))=0:0,1:1)
- q:'$d(json("entry",zi,"resource"))
- q:$o(json("entry",zi,"resource","note",""))=""
+ q:'$d(@json@("entry",zi,"resource"))
+ q:$o(@json@("entry",zi,"resource","note",""))=""
  d:$l($g(jlog)) log^SYNFENC(jlog,"FHIR Encounter.note ingest: graph="_dograph_" tiu="_dotiu)
  i dograph d KILLNOTEZI^SYNFTIU(ien,zi)
  s ni=""
- f  s ni=$o(json("entry",zi,"resource","note",ni)) q:ni=""  q:ni'=+ni  d
- . s txt=$g(json("entry",zi,"resource","note",ni,"text"))
+ f  s ni=$o(@json@("entry",zi,"resource","note",ni)) q:ni=""  q:ni'=+ni  d
+ . s txt=$g(@json@("entry",zi,"resource","note",ni,"text"))
  . q:'$l(txt)
  . i dograph d  ;
  . . s sep="-------- FHIR note #"_ni_" --------"
