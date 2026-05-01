@@ -91,6 +91,16 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . new id set id=$get(@json@("entry",zi,"resource","id"))
  . set @eval@("encounters",zi,"vars","id")=id
  . d log(jlog,"ID is: "_id)
+ . new knownVisit s knownVisit=$$visitIen^SYNFENC(ien,id)
+ . if +knownVisit>0,$o(@json@("entry",zi,"resource","note",""))'="" do  quit  ;
+ . . d log(jlog,"Encounter already has visitIen "_knownVisit_"; filing Encounter.note only")
+ . . s @eval@("encounters",zi,"visitIen")=knownVisit
+ . . s @eval@("encounters",zi,"status","loadstatus")="loaded"
+ . . s @eval@("encounters",zi,"status","loadMessage")="1^"_knownVisit_"^known encounter note filed"
+ . . if $g(args("skipEncounterNotes"))'=1,$t(INGESTFHIR^SYNFTIU)'="" do
+ . . . d INGESTFHIR^SYNFTIU(ien,zi,id,dfn,knownVisit,jlog,.json,.args)
+ . . . if $d(@root@(ien,"load","encounters",zi,"note")) m @eval@("encounters",zi,"note")=@root@(ien,"load","encounters",zi,"note")
+ . . s @eval@("encounters","status","loaded")=$g(@eval@("encounters","status","loaded"))+1
  . ;
  . new enccode set enccode=$get(@json@("entry",zi,"resource","type",1,"coding",1,"code"))
  . ;n visitcpt s visitcpt=$$MAP^SYNQLDM(enccode)
@@ -227,7 +237,7 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . . . d ENCTUPD^SYNDHP61(.RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT,dxIcdCs)        ;Encounter update
  . . d log(jlog,"Return from data loader was: "_$g(RETSTA))
  . . ;
- . . ; MERGE keeps destination subscripts not present in RETSTA — stale ENCDATA/DIERR from prior runs otherwise.
+ . . ; MERGE keeps destination subscripts not present in RETSTA - stale ENCDATA/DIERR from prior runs otherwise.
  . . k @eval@("encounters",zi,"status","return")
  . . m @eval@("encounters",zi,"status","return")=RETSTA
  . . n visitIen s visitIen=$p(RETSTA,"^",2) ; returned visit ien
@@ -245,7 +255,7 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . . . s @eval@("encounters","status","errors")=$g(@eval@("encounters","status","errors"))+1
  . . . s @eval@("encounters",zi,"status","loadstatus")="notLoaded"
  . . . s @eval@("encounters",zi,"status","loadMessage")=$g(RETSTA)
- . . ; Do not KILL encounters,zi here — only return was cleared above before merge. Data already lives at @root@(ien,"load","encounters",zi).
+ . . ; Do not KILL encounters,zi here - only return was cleared above before merge. Data already lives at @root@(ien,"load","encounters",zi).
  . . ; FHIR Encounter.note -> fhir-intake graph (TONOTEZI) + visit-linked TIU (MAKE^TIUSRVP)
  . . i +$g(RETSTA)=1,+visitIen>0,$g(args("skipEncounterNotes"))'=1,$t(INGESTFHIR^SYNFTIU)'="" d  ;
  . . . d INGESTFHIR^SYNFTIU(ien,zi,id,dfn,visitIen,jlog,.json,.args)
@@ -280,8 +290,15 @@ visitIen(ien,encId)     ; extrinsic returns the visit ien for the Encounter ID
  n root s root=$$setroot^SYNWD("fhir-intake")
  n useenc s useenc=encId
  i useenc["urn:uuid:" s useenc=$p(useenc,"urn:uuid:",2)
+ i useenc["Encounter/" s useenc=$p(useenc,"Encounter/",2)
  n vrtn
  s vrtn=$o(@root@(ien,"SPO",useenc,"visitIen",""))
+ i vrtn'="" q vrtn
+ n zi
+ s zi=0
+ f  s zi=$o(@root@(ien,"load","encounters",zi)) q:+zi=0  d  q:vrtn'=""
+ . q:$g(@root@(ien,"json","entry",zi,"resource","id"))'=useenc
+ . s vrtn=$g(@root@(ien,"load","encounters",zi,"visitIen"))
  i vrtn="" s vrtn=-1
  q vrtn
  ;

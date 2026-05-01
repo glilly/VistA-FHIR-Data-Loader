@@ -90,6 +90,7 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  . s X="importLabs^SYNFLAB(.return,ien,.ARGS)" d @X
  . s X="importVitals^SYNFVIT(.return,ien,.ARGS)" d @X
  . s X="importEncounters^SYNFENC(.return,ien,.ARGS)" d @X
+ . i $t(importDocRefs^SYNFTIU)'="" s X="importDocRefs^SYNFTIU(.return,ien,.ARGS)" d @X
  . s X="importImmu^SYNFIMM(.return,ien,.ARGS)" d @X
  . s X="importConditions^SYNFPR2(.return,ien,.ARGS)" d @X
  . s X="importAllergy^SYNFALG(.return,ien,.ARGS)" d @X
