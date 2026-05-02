@@ -32,35 +32,49 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  ;
  ; Locate graph row ien: query ien=, dfn= (VistA DFN on file), icn= / id= (full ICN string)
  ;
- n icn,had,dnx
+ n icn,had,dnx,newrow
+ s (dnx,newrow)=0
  s had=0
  s ien=+$g(ARGS("ien")) i ien>0 s had=1
  i ien<1 s dnx=+$g(ARGS("dfn")) i dnx>0 s had=1,ien=$$dfn2ien^SYNFUTL(dnx)
  s icn=$g(ARGS("icn")) i icn="" s icn=$g(ARGS("id"))
  i ien<1,icn'="" s had=1,ien=$o(@root@("POS","ICN",icn,""))
+ i ien<1,dnx<1,icn'="" s dnx=+$o(^DPT("AFICN",icn,""))
+ i ien<1,dnx>0,$d(^DPT(dnx,0)) d
+ . s ien=$order(@root@(" "),-1)+1
+ . s newrow=1
  i ien<1 d  q 0
  . s HTTPERR=$s($g(had):404,1:400)
- i '$d(@root@(ien,"json","entry")) d  q 0
+ i 'newrow,'$d(@root@(ien,"json","entry")) d  q 0
  . s HTTPERR=404
  ;
  merge json=BODY
  i '$d(json) d  q 0 ;
  . s HTTPERR=400
  ;
- n gr1,zi,cnt,rien ; initial entries
+ n gr1,zi,cnt,rien,lastrien,haspat ; initial entries
  do DECODE^XLFJSON("json","gr1")
  ;
- ; start from existing graph row so indexes/json are not truncated to the delta only
- m gr(ien)=@root@(ien)
- ;
- ; shift resource numbers to fit in graph
- ;
- n lastrien s lastrien=$o(gr(ien,"json","entry"," "),-1)
- s zi=0 s cnt=0
- f  s zi=$o(gr1("entry",zi)) q:+zi=0  d  ;
- . s cnt=cnt+1
- . s rien=lastrien+cnt
- . m gr(ien,"json","entry",rien)=gr1("entry",zi)
+ i newrow d  ;
+ . ; VistA-only patients get a new graph row containing just this update bundle.
+ . m gr(ien,"json")=gr1
+ . s lastrien=0
+ . s zi=0,cnt=0
+ . f  s zi=$o(gr1("entry",zi)) q:+zi=0  s cnt=cnt+1
+ e  d  ;
+ . ; start from existing graph row so indexes/json are not truncated to the delta only
+ . m gr(ien)=@root@(ien)
+ . ;
+ . ; shift resource numbers to fit in graph
+ . ;
+ . s lastrien=$o(gr(ien,"json","entry"," "),-1)
+ . s haspat=$$HASPAT($na(gr(ien)))
+ . s zi=0,cnt=0
+ . f  s zi=$o(gr1("entry",zi)) q:+zi=0  d  ;
+ . . i haspat,$g(gr1("entry",zi,"resource","resourceType"))="Patient" q
+ . . s cnt=cnt+1
+ . . s rien=lastrien+cnt
+ . . m gr(ien,"json","entry",rien)=gr1("entry",zi)
  ;
  ;
  do indexFhir(ien,"gr")
@@ -72,6 +86,7 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  . i dfr'="" s icn=$$dfn2icn^SYNFUTL(dfr)
  set return("icn")=icn
  set return("ien")=ien
+ if newrow set return("createdGraph")=1
  n bundle s bundle=$$bundleId($na(gr(ien)))
  set return("bundle")=bundle
  set ARGS("bundle")=bundle ; ingest only resources in this bundle
@@ -80,11 +95,13 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  ; commit merged json subtree for this graph ien only
  m @root@(ien)=gr(ien)
  ;
- new rdfn set rdfn=$o(@root@("SPO",ien,"DFN",""))
- if rdfn'="" set @root@("DFN",rdfn,ien)=""
+ new rdfn set rdfn=$s(dnx>0:dnx,1:$o(@root@("SPO",ien,"DFN","")))
+ if rdfn'="" do LNKPAT(ien,rdfn,.icn,root)
+ if icn'="" set return("icn")=icn
  ;
  if rdfn'="" do  ; patient creation was successful
  . if $g(ARGS("load"))="" s ARGS("load")=1
+ . if +$g(ARGS("load"))=0 s return("loadStatus")="skipped" q
  . ;do taskLabs(.return,ien,.ARGS)
  . n X
  . s X="importLabs^SYNFLAB(.return,ien,.ARGS)" d @X
@@ -107,6 +124,39 @@ wsUpdatePatient(ARGS,BODY,RESULT)    ; recieve from updatepatient
  set HTTPRSP("mime")="application/json"
  ;
  quit 1
+ ;
+LNKPAT(ien,dfn,icn,root) ; link an existing VistA patient to a graph row
+ i $g(root)="" s root=$$setroot^SYNWD("fhir-intake")
+ q:+$g(ien)<1
+ q:+$g(dfn)<1
+ q:'$d(^DPT(dfn,0))
+ s @root@("DFN",dfn,ien)=""
+ s @root@(ien,"DFN",dfn)=""
+ d setIndex^SYNFUTL(ien,"DFN",dfn)
+ i $g(@root@(ien,"load","Patient","status","DFN"))="" s @root@(ien,"load","Patient","status","DFN")=dfn
+ i $g(@root@(ien,"load","Patient","status","loadStatus"))="" s @root@(ien,"load","Patient","status","loadStatus")="loaded"
+ s icn=$$DPTICN(dfn,$g(icn))
+ i icn'="",icn'=-1 d  ;
+ . s @root@("ICN",icn,ien)=""
+ . s @root@(ien,"ICN",icn)=""
+ . d setIndex^SYNFUTL(ien,"ICN",icn)
+ . i $g(@root@(ien,"load","Patient","status","ICN"))="" s @root@(ien,"load","Patient","status","ICN")=icn
+ q
+ ;
+DPTICN(dfn,icn) ; existing patient ICN, without assigning a new one
+ s icn=$g(icn)
+ i icn'="" q icn
+ i $t(icn^SYNFPAT)'="" d
+ . s icn=$$icn^SYNFPAT(dfn)
+ i icn'="",icn'=-1 q icn
+ s icn=$o(^DPT("ARFICN",dfn,""))
+ q icn
+ ;
+HASPAT(ary) ; true if graph row already has a Patient resource
+ n zi
+ s zi=0
+ f  s zi=$o(@ary@("json","entry",zi)) q:+zi=0  i $g(@ary@("json","entry",zi,"resource","resourceType"))="Patient" q
+ q $s(+zi>0:1,1:0)
  ;
 indexFhir(ien,root)  ; generate indexes for parsed fhir json
  ;

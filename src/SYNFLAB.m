@@ -38,11 +38,12 @@ importLabs(rtn,ien,args) ; entry point for loading labs for a patient
  ;. m @root@(ien,"load","labs")=grtn("labs")
  ;. if $g(args("debug"))=1 m rtn=grtn
  if $g(args("debug"))=1 m rtn=grtn
- s rtn("labsStatus","status")=grtn("status","status")
- s rtn("labsStatus","loaded")=grtn("status","loaded")
- s rtn("labsStatus","errors")=grtn("status","errors")
- s rtn("panelsStatus","loaded")=grtn("panelStatus","loaded")
- s rtn("panelsStatus","errors")=grtn("panelStatus","errors")
+ s rtn("labsStatus","status")=$g(grtn("status","status"),"skipped")
+ s rtn("labsStatus","loaded")=+$g(grtn("status","loaded"))
+ s rtn("labsStatus","errors")=+$g(grtn("status","errors"))
+ s rtn("panelsStatus","status")=$g(grtn("panelStatus","status"),"skipped")
+ s rtn("panelsStatus","loaded")=+$g(grtn("panelStatus","loaded"))
+ s rtn("panelsStatus","errors")=+$g(grtn("panelStatus","errors"))
  q
  ;
 SKPLAB(args) ; extrinsic: 1 = skip labs and panels for this intake
