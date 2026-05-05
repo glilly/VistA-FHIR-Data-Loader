@@ -284,6 +284,39 @@ loadStatus(typ,zx,zien) ; extrinsic return 1 if resource was loaded
  i $get(@root@(zien,"load",typ,zx,"status","loadstatus"))="loaded" s rt=1
  q rt
  ;
+retryEncounterTiuNotes(rtn,ien,args) ; File missing TIU from Encounter.note (plain text); bypasses encounter loadStatus skip
+ ; For patients where ENCTUPD ran and load.encounters status is "loaded" but INGESTFHIR never filed (e.g. first replay skipped).
+ ; Idempotent: INGESTFHIR^SYNFTIU skips note indices that already have @jlog@("tiu",ni,"ien").
+ ; Call via replayIntakeDomains with args("retryEncounterTiuNotes")=1 or GET replayIntake?dfn=&retryEncounterTiuNotes=1
+ n root,troot,eval,json,dfn,zi,id,jlog,knownVisit,ni,skipped,filed,all
+ k rtn("retryEncounterTiuNotes")
+ s root=$$setroot^SYNWD("fhir-intake")
+ s dfn=$$ien2dfn^SYNFUTL(ien)
+ i +dfn<1 s rtn("retryEncounterTiuNotes","status")="error",rtn("retryEncounterTiuNotes","reason")="no DFN for graph ien" q
+ s troot=$na(@root@(ien,"type","Encounter"))
+ s json=$na(@root@(ien,"json"))
+ s eval=$na(@root@(ien,"load"))
+ s (skipped,filed)=0
+ s zi=0
+ f  s zi=$o(@troot@(zi)) q:+zi=0  d
+ . s jlog=$na(@eval@("encounters",zi))
+ . i $g(@json@("entry",zi,"resource","resourceType"))'="Encounter" q
+ . i $o(@json@("entry",zi,"resource","note",""))="" s skipped=skipped+1 q
+ . s ni="",all=1
+ . f  s ni=$o(@json@("entry",zi,"resource","note",ni)) q:ni=""  q:ni'=+ni  d
+ . . i +$g(@eval@("encounters",zi,"tiu",ni,"ien"))<1 s all=0
+ . i all s skipped=skipped+1 q
+ . s id=$g(@json@("entry",zi,"resource","id"))
+ . s knownVisit=$$visitIen^SYNFENC(ien,id)
+ . i +knownVisit<1 d log(jlog,"retryTiuNotes: no visitIen for encounter id="_id) s skipped=skipped+1 q
+ . d INGESTFHIR^SYNFTIU(ien,zi,id,dfn,knownVisit,jlog,.json,.args)
+ . i $d(@root@(ien,"load","encounters",zi,"note")) m @eval@("encounters",zi,"note")=@root@(ien,"load","encounters",zi,"note")
+ . s filed=filed+1
+ s rtn("retryEncounterTiuNotes","status")="ok"
+ s rtn("retryEncounterTiuNotes","encountersNotesFiled")=filed
+ s rtn("retryEncounterTiuNotes","encountersSkipped")=skipped
+ q
+ ;
 visitIen(ien,encId)     ; extrinsic returns the visit ien for the Encounter ID
  ; returns -1 if none found
  i $g(encId)="" q -1

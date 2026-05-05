@@ -189,6 +189,8 @@ INGESTFHIR(ien,zi,encid,dfn,vsit,jlog,json,args) ; Encounter.note -> graph + TIU
  i dograph d KILLNOTEZI^SYNFTIU(ien,zi)
  s ni=""
  f  s ni=$o(@json@("entry",zi,"resource","note",ni)) q:ni=""  q:ni'=+ni  d
+ . i +$g(@jlog@("tiu",ni,"ien"))>0 d  q
+ . . d:$l($g(jlog)) log^SYNFENC(jlog,"FHIR Encounter.note ni="_ni_" already has TIU; skip")
  . s txt=$g(@json@("entry",zi,"resource","note",ni,"text"))
  . q:'$l(txt)
  . s titleName=$$TIUTITLE^SYNFTIU(json,zi,ni,txt)

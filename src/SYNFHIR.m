@@ -105,12 +105,14 @@ replayIntakeDomains(rtn,ien,ARGS) ; rerun all non-Patient loaders from stored bu
  . s rtn("reason")="cannot resolve DFN; pass filter dfn (or ARGS(""dfn"")) for orphan graph after failed patient filing"
  s @root@("DFN",rdfn,ien)=""
  s rtn("ien")=ien,rtn("dfn")=rdfn,rtn("status")="ok"
+ i +$g(ARGS("retryEncounterTiuNotes")) d retryEncounterTiuNotes^SYNFENC(.rtn,ien,.ARGS) q
  d IMPORTFHIRDOMS^SYNFHIR(.rtn,ien,.ARGS)
  q
  ;
 wsReplayIntake(RTN,FILTER) ; GET replayIntake?ien=&dfn= — rerun IMPORTFHIRDOMS from graph
  ; Pass ien for the graph row holding the Synthea JSON. If that row is orphan (duplicate SSN), pass dfn of the existing patient too.
  ; If only dfn is passed, ien is $$dfn2ien (latest linked graph for that patient).
+ ; Optional FILTER("retryEncounterTiuNotes")=1 : only Encounter.note -> TIU (see retryEncounterTiuNotes^SYNFENC).
  n return,ARGS,ien,dfn
  s ien=+$g(FILTER("ien"))
  s dfn=+$g(FILTER("dfn"))
@@ -122,6 +124,7 @@ wsReplayIntake(RTN,FILTER) ; GET replayIntake?ien=&dfn= — rerun IMPORTFHIRDOMS
  s ARGS("load")=$s($g(FILTER("load"))'="":+$g(FILTER("load")),1:1)
  s ARGS("dfn")=dfn
  s ARGS("reindex")=$s($g(FILTER("reindex"))="":1,1:+$g(FILTER("reindex")))
+ s ARGS("retryEncounterTiuNotes")=+$g(FILTER("retryEncounterTiuNotes"))
  d replayIntakeDomains^SYNFHIR(.return,ien,.ARGS)
  d ENCODE^XLFJSON("return","RTN")
  s HTTPRSP("mime")="application/json"
