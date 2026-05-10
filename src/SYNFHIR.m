@@ -124,7 +124,9 @@ wsReplayIntake(RTN,FILTER) ; GET replayIntake?ien=&dfn= — rerun IMPORTFHIRDOMS
  s ARGS("load")=$s($g(FILTER("load"))'="":+$g(FILTER("load")),1:1)
  s ARGS("dfn")=dfn
  s ARGS("reindex")=$s($g(FILTER("reindex"))="":1,1:+$g(FILTER("reindex")))
- s ARGS("retryEncounterTiuNotes")=+$g(FILTER("retryEncounterTiuNotes"))
+ ; Query keys are typically lower-cased into FILTER — accept camelCase fallback for direct M callers.
+ s ARGS("retryEncounterTiuNotes")=+$g(FILTER("retryencountertiunotes"))
+ i ARGS("retryEncounterTiuNotes")<1 s ARGS("retryEncounterTiuNotes")=+$g(FILTER("retryEncounterTiuNotes"))
  d replayIntakeDomains^SYNFHIR(.return,ien,.ARGS)
  d ENCODE^XLFJSON("return","RTN")
  s HTTPRSP("mime")="application/json"

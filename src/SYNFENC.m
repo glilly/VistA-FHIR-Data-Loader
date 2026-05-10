@@ -91,8 +91,11 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . new id set id=$get(@json@("entry",zi,"resource","id"))
  . set @eval@("encounters",zi,"vars","id")=id
  . d log(jlog,"ID is: "_id)
+ . new HFACTORS
+ . d HFACTORS(.HFACTORS,json,zi)
+ . i $d(HFACTORS) m @eval@("encounters",zi,"parms","HEALTH FACTOR")=HFACTORS
  . new knownVisit s knownVisit=$$visitIen^SYNFENC(ien,id)
- . if +knownVisit>0,$o(@json@("entry",zi,"resource","note",""))'="" do  quit  ;
+ . if +knownVisit>0,'$d(HFACTORS),$o(@json@("entry",zi,"resource","note",""))'="" do  quit  ;
  . . d log(jlog,"Encounter already has visitIen "_knownVisit_"; filing Encounter.note only")
  . . s @eval@("encounters",zi,"visitIen")=knownVisit
  . . s @eval@("encounters",zi,"status","loadstatus")="loaded"
@@ -227,14 +230,14 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . if $g(args("load"))=1 d  ; only load if told to
  . . if $g(ien)="" n ien s ien=$$dfn2ien^SYNFUTL(dfn)
  . . i ien="" q  ;
- . . if $$loadStatus("encounters",zi,ien)=1 do  quit  ;
+ . . if $$loadStatus("encounters",zi,ien)=1,'$d(HFACTORS) do  quit  ;
  . . . d log(jlog,"Encounter already loaded, skipping")
  . . i hl7time="" d
  . . . s RETSTA="-1^Missing encounter visit date (period.start/end)"
  . . . d log(jlog,"Skipping ENCTUPD: no HL7 start date")
  . . e  d
  . . . d log(jlog,"Calling ENCTUPD^SYNDHP61 data loader to add encounter")
- . . . d ENCTUPD^SYNDHP61(.RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT,dxIcdCs)        ;Encounter update
+ . . . d ENCTUPD^SYNDHP61(.RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT,dxIcdCs,.HFACTORS,+$g(knownVisit))        ;Encounter update
  . . d log(jlog,"Return from data loader was: "_$g(RETSTA))
  . . ;
  . . ; MERGE keeps destination subscripts not present in RETSTA - stale ENCDATA/DIERR from prior runs otherwise.
@@ -276,6 +279,71 @@ log(ary,txt)    ; adds a text line to @ary@("log")
  s @ary@("log",$o(@ary@("log",""),-1)+1)=$g(txt)
  w:$G(DEBUG) !,"      ",$G(txt)
  q
+ ;
+HFACTORS(OUT,json,zi) ; Extract VistA Health Factor Encounter extensions
+ n ei,cnt,name,comment,mag,sev,url
+ k OUT
+ s (cnt,ei)=0
+ f  s ei=$o(@json@("entry",zi,"resource","extension",ei)) q:+ei=0  d
+ . s url=$g(@json@("entry",zi,"resource","extension",ei,"url"))
+ . q:url'=$$HFURL()
+ . s name=$$EXTVAL(json,zi,ei,"name")
+ . q:name=""
+ . s cnt=cnt+1
+ . s OUT(cnt,"name")=name
+ . s comment=$$EXTVAL(json,zi,ei,"comment")
+ . i comment'="" s OUT(cnt,"comment")=comment
+ . s mag=$$EXTVAL(json,zi,ei,"magnitude")
+ . i mag'="" s OUT(cnt,"magnitude")=mag
+ . s sev=$$EXTVAL(json,zi,ei,"severity")
+ . i sev'="" s OUT(cnt,"severity")=sev
+ i cnt=0 d NOTEHF(.OUT,json,zi,.cnt)
+ q
+ ;
+NOTEHF(OUT,json,zi,cnt) ; Fallback: parse Encounter.note "Health Factors:" block
+ n inhf,line,ni,txt,x
+ s ni=0
+ f  s ni=$o(@json@("entry",zi,"resource","note",ni)) q:+ni=0  d
+ . s txt=$g(@json@("entry",zi,"resource","note",ni,"text"))
+ . q:txt=""
+ . s inhf=0
+ . f x=1:1:$l(txt,$c(10)) d
+ . . s line=$$TRIM($p(txt,$c(10),x))
+ . . i $$UP(line)="HEALTH FACTORS:" s inhf=1 q
+ . . q:'inhf
+ . . i line="" q
+ . . i line[":" q
+ . . s cnt=+$g(cnt)+1
+ . . s OUT(cnt,"name")=line
+ . . s OUT(cnt,"comment")="FHIR Encounter.note Health Factors: "_line
+ q
+ ;
+EXTVAL(json,zi,ei,name) ; value from child extension by url
+ n ni,val
+ s ni=0
+ f  s ni=$o(@json@("entry",zi,"resource","extension",ei,"extension",ni)) q:+ni=0  d  q:$d(val)
+ . q:$g(@json@("entry",zi,"resource","extension",ei,"extension",ni,"url"))'=name
+ . s val=$$VALNODE(json,zi,ei,ni)
+ q $g(val)
+ ;
+VALNODE(json,zi,ei,ni) ; first primitive value[x] from extension
+ n key,val
+ s key=""
+ f  s key=$o(@json@("entry",zi,"resource","extension",ei,"extension",ni,key)) q:key=""  d  q:$d(val)
+ . q:key="url"
+ . i $e(key,1,5)="value" s val=$g(@json@("entry",zi,"resource","extension",ei,"extension",ni,key))
+ q $g(val)
+ ;
+HFURL() ; canonical VistA Health Factor extension URL
+ q "http://vistaplex.org/fhir/StructureDefinition/vista-health-factor"
+ ;
+TRIM(X) ; trim spaces
+ f  q:$e($g(X),1)'=" "  s X=$e(X,2,$l(X))
+ f  q:$e($g(X),$l(X))'=" "  s X=$e(X,1,$l(X)-1)
+ q $g(X)
+ ;
+UP(X) ; uppercase
+ q $tr($g(X),"abcdefghijklmnopqrstuvwxyz","ABCDEFGHIJKLMNOPQRSTUVWXYZ")
  ;
 loadStatus(typ,zx,zien) ; extrinsic return 1 if resource was loaded
  n root s root=$$setroot^SYNWD("fhir-intake")
