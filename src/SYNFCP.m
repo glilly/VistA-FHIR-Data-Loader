@@ -71,6 +71,9 @@ wsIntakeCareplan(args,body,result,ien)        ; web service entry (post)
  . ;
  . new jlog set jlog=$name(@eval@("careplan",zi))
  . ;
+ . if $g(ien)'="" if $$loadStatus("careplan",zi,ien)=1 do  quit  ;
+ . . d skiplog(jlog,"CarePlan already loaded, skipping")
+ . ;
  . d log(jlog,"DFN: "_dfn)
  . ;
  . ; insure that the resourceType is CarePlan
@@ -84,7 +87,7 @@ wsIntakeCareplan(args,body,result,ien)        ; web service entry (post)
  . ; see if this resource has already been loaded. if so, skip it
  . ;
  . if $g(ien)'="" if $$loadStatus("careplan",zi,ien)=1 do  quit  ;
- . . d log(jlog,"CarePlan already loaded, skipping")
+ . . d skiplog(jlog,"CarePlan already loaded, skipping")
  . ;
  . ; determine CarePlan snomed code, coding system, and display text
  . ;
@@ -392,12 +395,22 @@ log(ary,txt)    ; adds a text line to @ary@("log")
  w:$G(DEBUG) !,"      ",$G(txt)
  q
  ;
+skiplog(ary,txt) ; record replay skip without growing operational log
+ s @ary@("status","loadstatus")="loaded"
+ s @ary@("status","loadMessage")=$g(txt)
+ s @ary@("status","replay")="skipped"
+ w:$G(DEBUG) !,"      ",$G(txt)
+ q
+ ;
 loadStatus(typ,zx,zien) ; extrinsic return 1 if resource was loaded
  n root s root=$$setroot^SYNWD("fhir-intake")
  n rt s rt=0
  i $g(zx)="" i $d(@root@(zien,"load",typ)) s rt=1 q rt
  i '$d(@root@(zien,"load",typ,zx,"status")) q rt
  i $get(@root@(zien,"load",typ,zx,"status","loadstatus"))="loaded" s rt=1
+ i $get(@root@(zien,"load",typ,zx,"status","loadStatus"))="loaded" s rt=1
+ i $get(@root@(zien,"load",typ,zx,"loadStatus"))="loaded" s rt=1
+ i +$get(@root@(zien,"load",typ,zx,"status","return"))=1 s rt=1
  q rt
  ;
 DX(ien,ptr,sep) ; extrinsic returns code^text for diagnosis in

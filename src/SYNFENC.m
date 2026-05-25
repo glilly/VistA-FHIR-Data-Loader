@@ -81,7 +81,7 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . ; see if this resource has already been loaded. if so, skip it
  . ;
  . if $g(ien)'="" if $$loadStatus("encounters",zi,ien)=1 do  quit  ;
- . . d log(jlog,"Encounter already loaded, skipping")
+ . . d skiplog(jlog,"Encounter already loaded, skipping")
  . ;
  . ; determine Encounters code, coding system, and display text
  . ;
@@ -231,7 +231,7 @@ wsIntakeEncounters(args,body,result,ien)        ; web service entry (post)
  . . if $g(ien)="" n ien s ien=$$dfn2ien^SYNFUTL(dfn)
  . . i ien="" q  ;
  . . if $$loadStatus("encounters",zi,ien)=1,'$d(HFACTORS) do  quit  ;
- . . . d log(jlog,"Encounter already loaded, skipping")
+ . . . d skiplog(jlog,"Encounter already loaded, skipping")
  . . i hl7time="" d
  . . . s RETSTA="-1^Missing encounter visit date (period.start/end)"
  . . . d log(jlog,"Skipping ENCTUPD: no HL7 start date")
@@ -351,6 +351,13 @@ loadStatus(typ,zx,zien) ; extrinsic return 1 if resource was loaded
  i $g(zx)="" i $d(@root@(zien,"load",typ)) s rt=1 q rt
  i $get(@root@(zien,"load",typ,zx,"status","loadstatus"))="loaded" s rt=1
  q rt
+ ;
+skiplog(ary,txt) ; record replay skip without growing operational log
+ s @ary@("status","loadstatus")="loaded"
+ s @ary@("status","loadMessage")=$g(txt)
+ s @ary@("status","replay")="skipped"
+ w:$G(DEBUG) !,"      ",$G(txt)
+ q
  ;
 retryEncounterTiuNotes(rtn,ien,args) ; File missing TIU from Encounter.note (plain text); bypasses encounter loadStatus skip
  ; For patients where ENCTUPD ran and load.encounters status is "loaded" but INGESTFHIR never filed (e.g. first replay skipped).
