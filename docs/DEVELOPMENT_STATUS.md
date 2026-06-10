@@ -4,8 +4,8 @@ Status date: 2026-06-09
 Branch at time of writing: `vaready-wd-compat`
 
 Part of the VistA-on-FHIR workspace. Ecosystem-level context lives in
-`VistA-FHIR-Server-Codex/docs/PROJECT_OVERVIEW.md`; the cross-repo roadmap is
-`VistA-FHIR-Server-Codex/docs/PATH_FORWARD.md`.
+`Vista-on-FHIR/docs/PROJECT_OVERVIEW.md`; the cross-repo roadmap is
+`Vista-on-FHIR/docs/PATH_FORWARD.md`.
 
 ## Role of this repository
 
@@ -18,6 +18,13 @@ HTTP routes (`/addpatient`, `/updatepatient`, `/replayIntake`, `/vpr`,
 `/loadstatus`) via `SYNWEBRG.m`.
 
 Explicitly not for production — test/demo systems only.
+
+**Trajectory: transitional, then reference-only.** The C0FW framework in
+the FHIR server is the planned home of all FHIR-based updates to VistA. It
+was designed under a no-SYN/no-ISI constraint that was temporarily loosened
+for medications, labs, and procedures; once C0FW completes native coverage
+of those domains, no SYN routine is required in the solution and this repo
+is retained for reference only.
 
 ## What is working today
 
