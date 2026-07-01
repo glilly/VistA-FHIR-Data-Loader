@@ -22,9 +22,16 @@ DUZ() ; issues/set DUZ
  I '$D(DT) S DT=$$DT^XLFDT
  N VASITE S VASITE=$$SITE^VASITE
  N SITE S SITE=$P(VASITE,"^",3)
- S DUZ=$S(+$G(DUZ)=0:$$PROV^SYNINIT,1:DUZ)
+ S DUZ=$S(+$G(DUZ)>0:+DUZ,1:$$VPRDUZ())
  D DUZ^XUS1A
  Q DUZ
+ ;
+VPRDUZ() ; $$ - existing NEW PERSON for read-only VPR context
+ N IEN
+ S IEN=+$O(^VA(200,"B","PROVIDER,UNKNOWN SYNTHEA",0)) I IEN>0 Q IEN
+ S IEN=+$O(^VA(200,"B","POSTMASTER",0)) I IEN>0 Q IEN
+ S IEN=+$O(^VA(200,0)) I IEN>0 Q IEN
+ Q 1
  ;
  ;
 RESID(ENT,SITE,FILE,IEN,SUB) ; resource ID for records, visits, providers

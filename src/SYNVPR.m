@@ -211,7 +211,7 @@ show(what,docid,zout)     ;
  ;
 GET(ZRTN,ZDFN,ZTYP) ;
  I ZTYP="all" S ZTYP=""
- S FILTER("category")="CP;RA;SR"
+ S FILTER("category")="CP;RA;SR;E"
  D GET^VPRD(.ZRTN,ZDFN,ZTYP,2250101,$$NOW^XLFDT,,,.FILTER)
  Q
  ;
@@ -260,7 +260,7 @@ wsVPR(VPR,FILTER)       ; get from web service call
  I ZDFN="" S ZDFN=2
  S ZTYPE=$G(FILTER("domain"),"all")
  ; gpl FHIR project 9/15/2018
- s FILTER("category")="SR;RA;CP"
+ s FILTER("category")="SR;RA;CP;E"
  D GET(.ZTMP,ZDFN,ZTYPE)
  I $G(FILTER("format"))="xml" D  Q  ;
  . S HTTPRSP("mime")="text/xml"
