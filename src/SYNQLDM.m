@@ -447,7 +447,7 @@ INITMAPS        ; initialize maps
  S @G@(MAP,"CODE",998671,4002473)=""
  S @G@(MAP,"CODE",998675,4002474)=""
  S @G@(MAP,"CODE",998679,4002475)=""
- D INITMAPS^SYNFPAN(G)
+ I $T(+1^SYNFPAN)'="" D INITMAPS^SYNFPAN(G)
  N ZI
  S ZI=""
  F  S ZI=$O(@G@(ZI)) Q:ZI=""  D  ;
