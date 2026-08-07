@@ -1,6 +1,6 @@
 # Development Status and Gap Analysis — VistA-FHIR-Data-Loader (SYN)
 
-Status date: 2026-06-09
+Status date: 2026-08-07
 Branch at time of writing: `vaready-wd-compat`
 
 Part of the VistA-on-FHIR workspace. Ecosystem-level context lives in
@@ -27,6 +27,12 @@ of those domains, no SYN routine is required in the solution and this repo
 is retained for reference only.
 
 ## What is working today
+
+- **Recent (2026-06 → 2026-08):** LOINC `4548-4` / `4549-2` mapped to
+  HEMOGLOBIN A1C (`SYNQLDM.m`); RPMS VPR debug-read support; skip
+  `SYNFPAN` map init when the routine is not installed (RPMS-safe).
+  Local working tree also has uncommitted `SYNOS5PT.m` hardening (OS5 CPT
+  IEN collision / delimiter) — not part of the committed gate yet.
 
 - **Intake and orchestration**: `wsPostFHIR^SYNFHIR`, `wsUpdatePatient^SYNFHIRU`,
   `replayIntakeDomains` with selective category replay
