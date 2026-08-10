@@ -7,7 +7,8 @@ SYNOS5PT ; ven/gpl - populate OS5 entries in file 81 ;2026-03-15
  q
  ;
 EN ; ensure file 81 and Lexicon contain all OS5 codes from ^SYN
- n CODE,SCT,DESC,IEN,LEXIEN,LASTIEN,LASTLEX,ADDED,HEADER,LEXHDR,OLDHIGH
+ n CODE,SCT,DESC,IEN,LEXIEN,LASTIEN,LASTLEX,ADDED,HEADER,LEXHDR,OLDHIGH,U
+ s U="^"
  s LASTIEN=+$P($G(^ICPT(0)),U,3)
  i LASTIEN<199999999 s LASTIEN=199999999
  s LASTLEX=+$P($G(^LEX(757.02,0)),U,3)
@@ -19,7 +20,9 @@ EN ; ensure file 81 and Lexicon contain all OS5 codes from ^SYN
  . s DESC=$G(^SYN("2002.030","sct2os5","inverse",CODE,SCT))
  . q:DESC=""
  . s IEN=$O(^ICPT("B",CODE,""))
- . i 'IEN s LASTIEN=LASTIEN+1,IEN=LASTIEN,ADDED=ADDED+1
+ . i 'IEN d
+ . . f  s LASTIEN=LASTIEN+1 q:'$D(^ICPT(LASTIEN,0))
+ . . s IEN=LASTIEN,ADDED=ADDED+1
  . i '$D(^ICPT(IEN,0)) d ADD(IEN,CODE,DESC)
  . s LEXIEN=$O(^LEX(757.02,"CODE",CODE_" ",""))
  . i 'LEXIEN s LASTLEX=LASTLEX+1,LEXIEN=LASTLEX
@@ -40,7 +43,8 @@ EN ; ensure file 81 and Lexicon contain all OS5 codes from ^SYN
  q
  ;
 ADD(IEN,CODE,DESC) ; add one OS5 entry to file 81
- n EFF,SHORT
+ n EFF,SHORT,U
+ s U="^"
  s EFF=2110101
  s SHORT=$E(DESC,1,30)
  s ^ICPT(IEN,0)=CODE_U_DESC_U_30_U_U_U_"C"_U_U_EFF
@@ -68,7 +72,8 @@ ADD(IEN,CODE,DESC) ; add one OS5 entry to file 81
  q
  ;
 ADDLEX(IEN,CODE) ; add one OS5 entry to Lexicon code history
- n EFF
+ n EFF,U
+ s U="^"
  s EFF=2110101
  s ^LEX(757.02,IEN,0)=IEN_U_CODE_U_3_U_0_U_1_U_U_1
  s ^LEX(757.02,IEN,4,0)="^757.28DA^1^1"
