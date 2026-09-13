@@ -1,6 +1,9 @@
 SYNFHIRU ;ven/gpl - fhir loader utilities ;2018-08-17  3:27 PM
  ;;0.7;VISTA SYN DATA LOADER;;Mar 18, 2025
  ;
+ ; C0FWLD moved here 2026-09-13: cross-vintage replay guard shared by all
+ ; SYNF* domain loaders (see loadStatus in each).
+ ;
  ; Copyright (c) 2017-2018 George P. Lilly
  ;
  ;Licensed under the Apache License, Version 2.0 (the "License");
@@ -350,4 +353,25 @@ wsLoadStatus(rtn,filter) ; displays the load status
  s filter("local")=1
  d wsGLOBAL^SYNVPR(.rtn,.filter)
  q
+ ;
+C0FWLD(zien,zx) ; extrinsic: 1 if ANY load domain marked this entry loaded/skipped
+ ; Cross-vintage replay guard. The unified C0FW writeback marks entries under
+ ; capitalized domain keys (Observation, Lab, Encounter...) with a direct
+ ; "loadStatus" node, while legacy SYNF* loaders mark lowercase keys under
+ ; "status","loadstatus". Entry indices (zx) are unique across the bundle, so
+ ; a loaded/skipped marker at zx under ANY domain key means this entry is
+ ; already filed — replaying it would duplicate clinical data (proven on a
+ ; ci-roundtrip container: vitals 72 -> 144 without this guard).
+ n root,dom,st,rt
+ s rt=0
+ i $g(zx)="" q 0
+ i $g(zien)="" q 0
+ s root=$$setroot^SYNWD("fhir-intake")
+ s dom="" f  s dom=$o(@root@(zien,"load",dom)) q:dom=""!rt  d  ;
+ . n x
+ . s x=$g(@root@(zien,"load",dom,zx,"loadStatus"))
+ . i x="" s x=$g(@root@(zien,"load",dom,zx,"status","loadstatus"))
+ . i x="" s x=$g(@root@(zien,"load",dom,zx,"status","loadStatus"))
+ . i x="loaded"!(x="skipped") s rt=1
+ q rt
  ;

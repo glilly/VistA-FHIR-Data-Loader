@@ -62,6 +62,10 @@ wsIntakeMeds(args,body,result,ien)      ; web service entry (post)
  i $g(dfn)="" do  quit  ; need the patient
  . s result("meds",1,"log",1)="Error, patient not found.. terminating"
  ;
+ ; Snapshot the load flag in a namespaced local: the PSO prescription chain
+ ; under WRITERXRXN^SYNFMED KILLs common locals (args("load") among them), so
+ ; after the first filed med every later entry silently skipped filing.
+ new SYNMLOAD set SYNMLOAD=+$get(args("load"))
  new zi s zi=0
  for  set zi=$order(@troot@(zi)) quit:+zi=0  do  ;
  . ;
@@ -136,7 +140,7 @@ wsIntakeMeds(args,body,result,ien)      ; web service entry (post)
  . ; set up to call the data loader
  . ;
  . ;
- . if $g(args("load"))=1 d  ; only load if told to
+ . if SYNMLOAD=1 d  ; only load if told to (namespaced; see SYNMLOAD note above)
  . . if $g(ien)'="" if $$loadStatus("meds",zi,ien)=1 do  quit  ;
  . . . d log(jlog,"Meds already loaded, skipping")
  . . d log(jlog,"Calling WRITERXRXN^SYNFMED to add meds")
@@ -176,6 +180,8 @@ loadStatus(typ,zx,zien) ; extrinsic return 1 if resource was loaded
  n rt s rt=0
  i $g(zx)="" i $d(@root@(zien,"load",typ)) s rt=1 q rt
  i $get(@root@(zien,"load",typ,zx,"status","loadstatus"))="loaded" s rt=1
+ ; cross-vintage guard: honor unified C0FW markers too (see C0FWLD^SYNFHIRU)
+ i rt=0,$t(C0FWLD^SYNFHIRU)'="" s rt=$$C0FWLD^SYNFHIRU(zien,zx)
  q rt
  ;
 testall(limit,start)    ; run the meds import on all imported patients

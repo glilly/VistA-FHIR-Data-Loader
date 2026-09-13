@@ -187,6 +187,8 @@ loadStatus(typ,zx,zien) ; extrinsic return 1 if resource was loaded
  n rt s rt=0
  i $g(zx)="" i $d(@root@(zien,"load",typ)) s rt=1 q rt
  i $get(@root@(zien,"load",typ,zx,"status","loadstatus"))="loaded" s rt=1
+ ; cross-vintage guard: honor unified C0FW markers too (see C0FWLD^SYNFHIRU)
+ i rt=0,$t(C0FWLD^SYNFHIRU)'="" s rt=$$C0FWLD^SYNFHIRU(zien,zx)
  q rt
  ;
 testall ; run the procedures import on all imported patients

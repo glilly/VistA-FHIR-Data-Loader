@@ -406,6 +406,8 @@ loadStatus(typ,zx,zien) ; extrinsic return 1 if resource was loaded
  n root s root=$$setroot^SYNWD("fhir-intake")
  n rt s rt=0
  i $g(zx)="" i $d(@root@(zien,"load",typ)) s rt=1 q rt
+ ; cross-vintage guard: honor unified C0FW markers too (see C0FWLD^SYNFHIRU)
+ i $t(C0FWLD^SYNFHIRU)'="",$$C0FWLD^SYNFHIRU(zien,zx) q 1
  i '$d(@root@(zien,"load",typ,zx,"status")) q rt
  i $get(@root@(zien,"load",typ,zx,"status","loadstatus"))="loaded" s rt=1
  i $get(@root@(zien,"load",typ,zx,"status","loadStatus"))="loaded" s rt=1
