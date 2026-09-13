@@ -26,16 +26,19 @@ SYNWD     ;ven/gpl - mash graph utilities ; 9/24/17 4:33pm
 setroot(graph) ; root of working storage
  new RTN set RTN=$$GRTN($get(graph))
  if RTN="%wd" quit $$setroot^%wd(graph)
+ if RTN="WDIRECT" quit $$WDROOT($get(graph))
  quit $$setroot^SYNGRAF(graph)
  ;
 rootOf(graph) ; return the root of graph named graph
  new RTN set RTN=$$GRTN($get(graph))
  if RTN="%wd" quit $$rootOf^%wd(graph)
+ if RTN="WDIRECT" quit $$WDROOT($get(graph))
  quit $$rootOf^SYNGRAF(graph)
  ;
 addgraph(graph) ; makes a place in the graph file for a new graph
  new RTN set RTN=$$GRTN($get(graph))
  if RTN="%wd" quit $$addgraph^%wd(graph)
+ if RTN="WDIRECT" quit $$WDROOT($get(graph))
  quit $$addgraph^SYNGRAF(graph)
  ;
 purgegraph(graph) ; delete a graph
@@ -53,11 +56,13 @@ GRTN(GRAPH) ; detect the active graph backend for a named graph
  set GRAPH=$get(GRAPH)
  if $$SYNHAS(GRAPH) quit "SYNGRAF"
  if $$WDHAS(GRAPH) quit "%wd"
+ if $$WDHASD(GRAPH) quit "WDIRECT"
  ;
  ; If the requested graph does not exist yet, follow the store that already
  ; owns the standard SYN working graphs on this system.
  if $$SYNHAS("fhir-intake") quit "SYNGRAF"
  if $$WDHAS("fhir-intake") quit "%wd"
+ if $$WDHASD("fhir-intake") quit "WDIRECT"
  if $$SYNHAS("loinc-lab-map") quit "SYNGRAF"
  if $$WDHAS("loinc-lab-map") quit "%wd"
  if $$SYNHAS("html-cache") quit "SYNGRAF"
@@ -73,6 +78,35 @@ GRTN(GRAPH) ; detect the active graph backend for a named graph
  if $$SYNOK quit "SYNGRAF"
  if $$WDOK quit "%wd"
  quit "SYNGRAF"
+ ;
+WDHASD(GRAPH) ; named graph exists in the direct ^%wd data global
+ ; IRIS lanes: the ^%wd DATA global is present (translation-mapped) but the
+ ; %wd ROUTINE cannot be imported ("%wd.MAC is mapped from a database that
+ ; you do not have write permission on" - IRIS reserves non-%Z percent
+ ; routines). Mirror of WDHASD^C0FWGRT.
+ new GIEN,ROOT
+ if $get(GRAPH)="" quit 0
+ set ROOT="^"_$char(37)_"wd(17.040801,""B"")"
+ set GIEN=$order(@ROOT@(GRAPH,0))
+ quit $select(+GIEN>0:1,1:0)
+ ;
+WDROOT(GRAPH) ; $$ - direct ^%wd graph root for sites without the %wd routine
+ ; Mirror of WDROOT^C0FWGRT (creates the directory entry when missing).
+ new BROOT,GIEN,ROOT
+ set GRAPH=$get(GRAPH)
+ if GRAPH="" quit ""
+ set ROOT="^"_$char(37)_"wd(17.040801)"
+ set BROOT="^"_$char(37)_"wd(17.040801,""B"")"
+ set GIEN=$order(@BROOT@(GRAPH,0))
+ if GIEN<1 do
+ . set GIEN=$select(GRAPH="fhir-intake":3,1:$order(@ROOT@(" "),-1)+1)
+ . if GIEN<1 set GIEN=1
+ . set @ROOT@(GIEN,0)=GRAPH
+ . set @BROOT@(GRAPH,GIEN)=""
+ . if $get(@ROOT@(0))="" set @ROOT@(0)="graph^17.040801"
+ . if +$piece($get(@ROOT@(0)),"^",3)<GIEN set $piece(@ROOT@(0),"^",3)=GIEN
+ . set $piece(@ROOT@(0),"^",4)=+$piece($get(@ROOT@(0)),"^",4)+1
+ quit "^"_$char(37)_"wd(17.040801,"_GIEN_")"
  ;
 WDOK() ; legacy %wd graph store is available
  quit $select($text(setroot^%wd)="":0,$piece($get(^DIC(17.040801,0)),"^")="":0,1:1)
