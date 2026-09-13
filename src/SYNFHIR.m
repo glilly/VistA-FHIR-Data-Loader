@@ -105,8 +105,21 @@ replayIntakeDomains(rtn,ien,ARGS) ; rerun all non-Patient loaders from stored bu
  . s rtn("reason")="cannot resolve DFN; pass filter dfn (or ARGS(""dfn"")) for orphan graph after failed patient filing"
  s @root@("DFN",rdfn,ien)=""
  s rtn("ien")=ien,rtn("dfn")=rdfn,rtn("status")="ok"
- i +$g(ARGS("retryEncounterTiuNotes")) d retryEncounterTiuNotes^SYNFENC(.rtn,ien,.ARGS) q
+ i +$g(ARGS("retryEncounterTiuNotes")) d retryEncounterTiuNotes^SYNFENC(.rtn,ien,.ARGS) d INVCACHE(ien) q
  d IMPORTFHIRDOMS^SYNFHIR(.rtn,ien,.ARGS)
+ d INVCACHE(ien)
+ q
+ ;
+INVCACHE(ien) ; drop the C0FW read-through bundle cache after a replay
+ ; The unified server caches generated patient bundles under
+ ; @root@(ien,"cache") keyed by request signature (GET^C0FWCAC). A replay
+ ; changes the filed clinical data, so a stale cache would keep serving the
+ ; pre-replay bundle (seen on devfhir: meds replay invisible until a manual
+ ; refresh=1). Guarded: legacy sites without C0FWCAC just skip.
+ i +$g(ien)<1 q
+ i $t(INV^C0FWCAC)="" q
+ n $etrap s $etrap="s $ecode="""" q"
+ d INV^C0FWCAC(ien)
  q
  ;
 wsReplayIntake(RTN,FILTER) ; GET replayIntake?ien=&dfn= — rerun IMPORTFHIRDOMS from graph

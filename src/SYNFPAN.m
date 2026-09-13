@@ -50,95 +50,101 @@ PNOUT(rtn,jrslt,eval,st,ldov,erov) ; set rtn("status",*) for wsIntakePanels (all
  m rtn("status")=jrslt("result")
  q
  ;
-wsIntakePanels(args,body,result,ien) ; web service entry (post)
+wsIntakePanels(SYNARGS,SYNBODY,SYNRSLT,SYNIEN) ; web service entry (post)
  ; for intake of one or more Lab panel results. input are fhir resources
- ; result is json and summarizes what was done
- ; args include patientId
- ; ien is specified for internal calls, where the json is already in a graph
+ ; SYNRSLT is json and summarizes what was done
+ ; SYNARGS include patientId
+ ; SYNIEN is specified for internal calls, where the json is already in a graph
  ;
- n root,troot
- s root=$$setroot^SYNWD("fhir-intake")
+ ; NOTE on naming: every local this routine needs across a LAB^ISIIMP12 call
+ ; is SYN-namespaced. The ISI filer's LR* lab chain KILLs common local names
+ ; out from under the caller (same class as the PSO chain killing
+ ; args("load") in SYNFMED2 and the Day-4 LAST kill): with the old names
+ ; (troot/eval/json/args...) the panel loop died after the first filed
+ ; panel — 2 of 316 entries processed on the iris lane, silent stop.
+ ; Formal parameters are positional, so callers are unaffected.
  ;
- n jtmp,json,jrslt,eval
- s (troot,eval)=""
- ;i $g(ien)'="" if $$loadStatus("panels","",ien)=1 d  q  ;
- ;. s result("labsStatus","status")="alreadyLoaded"
- i $g(ien)'="" d  ; internal call
- . s troot=$na(@root@(ien,"type","DiagnosticReport"))
- . ;b
- . s eval=$na(@root@(ien,"load")) ; move eval to the graph
- . ;k @eval  ; this is to clear the load log during testing
+ n SYNROOT,SYNTROOT
+ s SYNROOT=$$setroot^SYNWD("fhir-intake")
+ ;
+ n SYNJSON,SYNJRSLT,SYNEVAL
+ s (SYNTROOT,SYNEVAL)=""
+ i $g(SYNIEN)'="" d  ; internal call
+ . s SYNTROOT=$na(@SYNROOT@(SYNIEN,"type","DiagnosticReport"))
+ . s SYNEVAL=$na(@SYNROOT@(SYNIEN,"load")) ; move eval to the graph
  ; todo: locate the patient and add the labs in BODY to the graph
  ;   this is for the use case when we are processing an update to
  ;   the patient rather than the initial load
  ;
- i $g(ien)="" d PNOUT^SYNFPAN(.result,.jrslt,"","skipped",0,0) q 0
- i '$d(@troot) d PNOUT^SYNFPAN(.result,.jrslt,.eval,"skipped",0,0) q 0
- s json=$na(@root@(ien,"json"))
+ i $g(SYNIEN)="" d PNOUT^SYNFPAN(.SYNRSLT,.SYNJRSLT,"","skipped",0,0) q 0
+ i '$d(@SYNTROOT) d PNOUT^SYNFPAN(.SYNRSLT,.SYNJRSLT,.SYNEVAL,"skipped",0,0) q 0
+ s SYNJSON=$na(@SYNROOT@(SYNIEN,"json"))
  ;
  ; Initialize panel counters on graph load node
- s @eval@("panels","status","errors")=0
- s @eval@("panels","status","loaded")=0
+ s @SYNEVAL@("panels","status","errors")=0
+ s @SYNEVAL@("panels","status","loaded")=0
+ ;
+ ; snapshot request flags (survive any downstream kill)
+ n SYNLOAD,SYNDBG
+ s SYNLOAD=+$g(SYNARGS("load")),SYNDBG=+$g(SYNARGS("debug"))
  ;
  ; determine the patient
  ;
- n dfn
- if $g(ien)'="" d  ;
- . s dfn=$$ien2dfn^SYNFUTL(ien) ; look up dfn in the graph
+ n SYNDFN
+ if $g(SYNIEN)'="" d  ;
+ . s SYNDFN=$$ien2dfn^SYNFUTL(SYNIEN) ; look up dfn in the graph
  else  d  ;
- . s dfn=$g(args("dfn"))
- . i dfn="" d  ;
- . . n icn s icn=$g(args("icn"))
- . . i icn'="" s dfn=$$icn2dfn^SYNFUTL(icn)
- i $g(dfn)="" d  q 0  ; need the patient
- . s result("panels",1,"log",1)="Error, patient not found.. terminating"
- . d PNOUT^SYNFPAN(.result,.jrslt,.eval,"error",0,0)
+ . s SYNDFN=$g(SYNARGS("dfn"))
+ . i SYNDFN="" d  ;
+ . . n icn s icn=$g(SYNARGS("icn"))
+ . . i icn'="" s SYNDFN=$$icn2dfn^SYNFUTL(icn)
+ i $g(SYNDFN)="" d  q 0  ; need the patient
+ . s SYNRSLT("panels",1,"log",1)="Error, patient not found.. terminating"
+ . d PNOUT^SYNFPAN(.SYNRSLT,.SYNJRSLT,.SYNEVAL,"error",0,0)
  ;
  ;
  new SYNZI s SYNZI=0
- for  set SYNZI=$order(@troot@(SYNZI)) quit:+SYNZI=0  do  ;
+ for  set SYNZI=$order(@SYNTROOT@(SYNZI)) quit:+SYNZI=0  do  ;
  . ;
  . ; define a place to log the processing of this entry
  . ;
- . new jlog set jlog=$name(@eval@("panels",SYNZI))
- . k @jlog
+ . new SYNJLOG set SYNJLOG=$name(@SYNEVAL@("panels",SYNZI))
+ . ; clear only log+vars: killing the whole entry node destroyed the
+ . ; "status","loadstatus"="loaded" marker BEFORE the loadStatus skip check,
+ . ; so every rerun refiled every panel (proven: run2 on a CI container
+ . ; re-accessioned all 11 panels). The marker must survive reruns.
+ . k @SYNJLOG@("log"),@SYNJLOG@("vars")
  . ;
  . ; ensure that the resourceType is DiagnosticReports
  . ;
- . new type set type=$get(@json@("entry",SYNZI,"resource","resourceType"))
- . ;if type'="DiagnosticReport" do  quit  ;
+ . new type set type=$get(@SYNJSON@("entry",SYNZI,"resource","resourceType"))
  . q:type'="DiagnosticReport"
- . ;. ;set @eval@("panels",SYNZI,"vars","resourceType")=type
- . ;. ;do log(jlog,"Resource type not DiagnosticReport, skipping entry")
- . ;set @eval@("panels",SYNZI,"vars","resourceType")=type
  . ;
  . ; determine the DiagnosticReport category and quit if not a lab panel
  . ;
- . ;new obstype set obstype=$get(@json@("entry",SYNZI,"resource","category",1,"coding",1,"code"))
- . new catcode set catcode=$get(@json@("entry",SYNZI,"resource","category",1,"coding",1,"code"))
+ . new catcode set catcode=$get(@SYNJSON@("entry",SYNZI,"resource","category",1,"coding",1,"code"))
  . q:$$UP^XLFSTR(catcode)'["LAB"
  . new loinc s loinc=""
- . set loinc=$g(@json@("entry",SYNZI,"resource","code","coding",1,"code"))
- . d log(jlog,"Panel loinc code is  "_loinc)
+ . set loinc=$g(@SYNJSON@("entry",SYNZI,"resource","code","coding",1,"code"))
+ . d log(SYNJLOG,"Panel loinc code is  "_loinc)
  . ;
  . ; see if this resource has already been loaded. if so, skip it
  . ;
- . if $g(ien)'="" if $$loadStatus("panels",SYNZI,ien)=1 do  quit  ;
- . . d log(jlog,"Panel already loaded, skipping")
+ . if $g(SYNIEN)'="" if $$loadStatus("panels",SYNZI,SYNIEN)=1 do  quit  ;
+ . . d log(SYNJLOG,"Panel already loaded, skipping")
  . ;
  . ; determine Panel type, code, coding system, and display text
  . ;
- . new paneltype set paneltype=$get(@json@("entry",SYNZI,"resource","code","text"))
- . if paneltype="" set paneltype=$get(@json@("entry",SYNZI,"resource","code","coding",1,"display"))
- . do log(jlog,"Panel type is: "_paneltype)
- . ;do log(jlog,"Panel type is: "_obsdisplay)
- . set @eval@("panels",SYNZI,"vars","type")=paneltype
+ . new paneltype set paneltype=$get(@SYNJSON@("entry",SYNZI,"resource","code","text"))
+ . if paneltype="" set paneltype=$get(@SYNJSON@("entry",SYNZI,"resource","code","coding",1,"display"))
+ . do log(SYNJLOG,"Panel type is: "_paneltype)
+ . set @SYNEVAL@("panels",SYNZI,"vars","type")=paneltype
  . ;
  . ; determine the id of the resource
  . ;
- . new id set id=$get(@json@("entry",SYNZI,"resource","id"))
- . set @eval@("panels",SYNZI,"vars","id")=id
- . d log(jlog,"ID is: "_id)
+ . new id set id=$get(@SYNJSON@("entry",SYNZI,"resource","id"))
+ . set @SYNEVAL@("panels",SYNZI,"vars","id")=id
+ . d log(SYNJLOG,"ID is: "_id)
  . ;
  . ;Here's the spec for uploading a panel:
  . ;KBANTEST ;
@@ -157,48 +163,41 @@ wsIntakePanels(args,body,result,ien) ; web service entry (post)
  . ;
  . ; starting the parameter array with the panel level elements
  . ;
- . n MISC ; parameter array
+ . n SYNMISC ; parameter array
  . ;
  . ; lab panel
  . ;
  . N PANEL
  . S PANEL=$$MAP^SYNQLDM(loinc,"vistapanel")
  . i PANEL="" do  quit
- . . d fail(jlog,eval,SYNZI,"Return: -1^Panel with loinc "_loinc_" has no mapping to a VistA Lab Panel")
- . d log(jlog,"VistA panel is: "_PANEL)
- . S MISC("LAB_PANEL")=PANEL
+ . . d fail(SYNJLOG,SYNEVAL,SYNZI,"Return: -1^Panel with loinc "_loinc_" has no mapping to a VistA Lab Panel")
+ . d log(SYNJLOG,"VistA panel is: "_PANEL)
+ . S SYNMISC("LAB_PANEL")=PANEL
  . ;
  . ; patient
  . ;
- . s MISC("PAT_SSN")=$$GET1^DIQ(2,dfn_",","SSN")
+ . s SYNMISC("PAT_SSN")=$$GET1^DIQ(2,SYNDFN_",","SSN")
  . ;
  . ; result date/time
  . ;
- . new effdate set effdate=$get(@json@("entry",SYNZI,"resource","effectiveDateTime"))
- . do log(jlog,"effectiveDateTime is: "_effdate)
- . set @eval@("panels",SYNZI,"vars","effectiveDateTime")=effdate
+ . new effdate set effdate=$get(@SYNJSON@("entry",SYNZI,"resource","effectiveDateTime"))
+ . do log(SYNJLOG,"effectiveDateTime is: "_effdate)
+ . set @SYNEVAL@("panels",SYNZI,"vars","effectiveDateTime")=effdate
  . new fmtime s fmtime=$$fhirTfm^SYNFUTL(effdate)
- . ; time adjustment to avoid duplicates
- . ;i $d(FMTIME(fmtime)) d  ;
- . ;. ;ZWR FMTIME
- . ;. n i s i=fmtime
- . ;. f fmtime=i:.000001 q:'$d(FMTIME(fmtime))
- . ;s FMTIME(fmtime)=""
- . d log(jlog,"fileman dateTime is: "_fmtime)
- . set @eval@("panels",SYNZI,"vars","fmDateTime")=fmtime ;
+ . d log(SYNJLOG,"fileman dateTime is: "_fmtime)
+ . set @SYNEVAL@("panels",SYNZI,"vars","fmDateTime")=fmtime ;
  . new hl7time s hl7time=$$fhirThl7^SYNFUTL(effdate)
- . d log(jlog,"hl7 dateTime is: "_hl7time)
- . set @eval@("panels",SYNZI,"vars","hl7DateTime")=hl7time ;
- . s MISC("RESULT_DT")=fmtime
+ . d log(SYNJLOG,"hl7 dateTime is: "_hl7time)
+ . set @SYNEVAL@("panels",SYNZI,"vars","hl7DateTime")=hl7time ;
+ . s SYNMISC("RESULT_DT")=fmtime
  . ;
  . ; location
  . ;
- . s DHPLOC=$$MAP^SYNQLDM("OP","location")
- . n DHPLOCIEN s DHPLOCIEN=$o(^SC("B",DHPLOC,""))
+ . n SYNDHPLC s SYNDHPLC=$$MAP^SYNQLDM("OP","location")
+ . n DHPLOCIEN s DHPLOCIEN=$o(^SC("B",SYNDHPLC,""))
  . if DHPLOCIEN="" S DHPLOCIEN=4
- . ;s @eval@("labs",SYNZI,"parms","DHPLOC")=DHPLOC
- . d log(jlog,"Location for outpatient is: #"_DHPLOCIEN_" "_DHPLOC)
- . s MISC("LOCATION")=DHPLOC
+ . d log(SYNJLOG,"Location for outpatient is: #"_DHPLOCIEN_" "_SYNDHPLC)
+ . s SYNMISC("LOCATION")=SYNDHPLC
  . ;
  . ; collection sample
  . ;
@@ -210,53 +209,50 @@ wsIntakePanels(args,body,result,ien) ; web service entry (post)
  . I CSAMP["Urine Sediment" S CSAMP="URINE"
  . I CSAMP["Platelet poor plasma" S CSAMP="PLASMA"
  . I CSAMP["Blood arterial" S CSAMP="ARTERIAL BLOOD"
- . d log(jlog,"Collection sample is: "_CSAMP)
- . s MISC("COLLECTION_SAMPLE")=CSAMP
+ . d log(SYNJLOG,"Collection sample is: "_CSAMP)
+ . s SYNMISC("COLLECTION_SAMPLE")=CSAMP
  . ;
  . ;  ; add code to process DiagnosticReport results here
  . ;
- . n triples s triples=$na(@root@(ien))
- . n atomptr s atomptr=$na(@json@("entry",SYNZI,"resource","result"))
+ . n triples s triples=$na(@SYNROOT@(SYNIEN))
+ . n atomptr s atomptr=$na(@SYNJSON@("entry",SYNZI,"resource","result"))
  . n atomdisp s atomdisp=""
- . n success s success="" ; array of labs to be marked as loaded on success
+ . n SYNSUCC s SYNSUCC="" ; array of labs to be marked as loaded on success
  . n rien s rien=""
  . n zj s zj=0
  . f  s zj=$o(@atomptr@(zj)) q:+zj=0  d  ;
  . . s atomdisp=$get(@atomptr@(zj,"display"))
  . . n atomref s atomref=$get(@atomptr@(zj,"reference"))
  . . s rien=$o(@triples@("SPO",atomref,"rien",""))
- . . d log(jlog,zj_" result "_atomdisp_" rien="_rien)
+ . . d log(SYNJLOG,zj_" result "_atomdisp_" rien="_rien)
  . . ;
  . . ; call one result lab
  . . ;
- . . n lablog s lablog=$na(@root@(ien,"load","labs",rien))
- . . D ONELAB(.MISC,json,rien,zj,jlog,eval,lablog,.success,atomdisp)
+ . . n lablog s lablog=$na(@SYNROOT@(SYNIEN,"load","labs",rien))
+ . . D ONELAB(.SYNMISC,SYNJSON,rien,zj,SYNJLOG,SYNEVAL,lablog,.SYNSUCC,atomdisp)
  . . ;
- . m @eval@("panels",SYNZI,"vars","MISC")=MISC ;
+ . m @SYNEVAL@("panels",SYNZI,"vars","MISC")=SYNMISC ;
  . ;
- . if $g(args("load"))=1 d  ; only load if told to
- . . if $g(ien)'="" if $$loadStatus("panels",SYNZI,ien)=1 do  quit  ;
- . . . d log(jlog,"Panel already loaded, skipping")
- . . d log(jlog,"Calling LAB^ISIIMP12 to add panel")
- . . n RESTA,RC
- . . s (RESTA,RC)=""
- . . ;i $g(DEBUG)=1 ZWRITE MISC
- . . S RESTA=$$LAB^ISIIMP12(.RC,.MISC)
+ . if SYNLOAD=1 d  ; only load if told to
+ . . if $g(SYNIEN)'="" if $$loadStatus("panels",SYNZI,SYNIEN)=1 do  quit  ;
+ . . . d log(SYNJLOG,"Panel already loaded, skipping")
+ . . d log(SYNJLOG,"Calling LAB^ISIIMP12 to add panel")
+ . . n SYNRESTA,SYNRC
+ . . s (SYNRESTA,SYNRC)=""
+ . . S SYNRESTA=$$LAB^ISIIMP12(.SYNRC,.SYNMISC)
  . . ;
- . . ;i $g(DEBUG)=1 ZWRITE RESTA
- . . ;i $g(DEBUG)=1 ZWRITE RC
- . . if +RESTA=1 do  ;
- . . . d log(jlog,"Return from LAB^ISIIMP12 was: "_$g(RESTA))
- . . . s @eval@("panels","status","loaded")=@eval@("panels","status","loaded")+1
- . . . s @eval@("panels",SYNZI,"status","loadstatus")="loaded"
- . . . d SUCCESS(SYNZI,.success,eval,ien) ; mark labs as loaded
- . . else  d fail(jlog,eval,SYNZI,"Return from LAB^ISIIMP12 was: "_$g(RESTA))
+ . . if +SYNRESTA=1 do  ;
+ . . . d log(SYNJLOG,"Return from LAB^ISIIMP12 was: "_$g(SYNRESTA))
+ . . . s @SYNEVAL@("panels","status","loaded")=@SYNEVAL@("panels","status","loaded")+1
+ . . . s @SYNEVAL@("panels",SYNZI,"status","loadstatus")="loaded"
+ . . . d SUCCESS(SYNZI,.SYNSUCC,SYNEVAL,SYNIEN) ; mark labs as loaded
+ . . else  d fail(SYNJLOG,SYNEVAL,SYNZI,"Return from LAB^ISIIMP12 was: "_$g(SYNRESTA))
  ;
- if $get(args("debug"))=1 do  ;
- . m jrslt("source")=@json
- . m jrslt("args")=args
- . m jrslt("eval")=@eval
- d PNOUT^SYNFPAN(.result,.jrslt,.eval,"ok",,)
+ if SYNDBG=1 do  ;
+ . m SYNJRSLT("source")=@SYNJSON
+ . m SYNJRSLT("args")=SYNARGS
+ . m SYNJRSLT("eval")=@SYNEVAL
+ d PNOUT^SYNFPAN(.SYNRSLT,.SYNJRSLT,.SYNEVAL,"ok",,)
  q:$Q 0 Q
  ;
 SUCCESS(SYNZI,success,eval,ien) ; after a panel has loaded, mark the successful lab tests as loaded
