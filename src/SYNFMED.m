@@ -25,6 +25,7 @@ RXN2MEDS(RXN) ; [Public] Get Drugs that are associated with an RxNorm
 RXN2VUI(RXN) ; [Public] Get ^ delimited VUIDs for an RxNorm
  N VUIDS S VUIDS=""
  n file
+ I $T(^ETSRXN)="" Q "" ; no ETS: do not hit rxnav (HOME DEVICE / hang)
  I $T(^ETSRXN)]"" d  quit VUIDS
  . n fileVUIDs s fileVUIDs=$$ETSRXN2VUID(RXN)
  . n i f i=1:1:$l(fileVUIDs,U) do
@@ -118,7 +119,7 @@ RXNCONV(RXN) ; [Private] Convert RxNorm CUI for non SCD to SCD drug
  I FIXED Q FIXED
  ;
  I $T(^ETSRXN)]"" Q $$ETSCONV(RXN)
- S $EC=",U-UNIMPLEMENTED,"
+ Q RXN ; no ETS: caller (ADDDRUG) fails cleanly if VUID cannot be resolved
  ;
 RXNBAD(RXN) ; [Private] Synthea Bad RxNorm Codes Translation
  N RXNBADDATA
