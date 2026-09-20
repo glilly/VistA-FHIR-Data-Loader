@@ -496,11 +496,14 @@ WRITERXPS(PSODFN,DRUG,RXDATE) ; [$$/D Public] Create a new prescription for a pa
  S PSOPAR=$G(^PS(59,PSOSITE,1)),PSOPAR7=$G(^PS(59,PSOSITE,"IB")),PSOSYS=$G(^PS(59.7,1,40.1)) D CUTDATE^PSOFUNC
  ;
  ; Add Patient to File 55 DINUMMED to 2
- N FDA,IEN,DIERR
- S FDA(55,"?+1,",.01)="`"_PSODFN
- S IEN(1)=PSODFN
- S FDA(55,"?+1,",3)="OPC" ; A convenient Patient Status
- D UPDATE^DIE("E","FDA","IEN")
+ ; Internal .01=DFN: FileMan 22.0 on WVEHR rejects external "`"_DFN
+ ; (CHK^DIE 55,.01,"E","`n" -> invalid; same DD as vehu10 where `n works).
+ N FDA,IEN,DIERR,C0FOPC
+ S FDA(55,"?+1,",.01)=+PSODFN
+ S IEN(1)=+PSODFN
+ S C0FOPC=$$FIND1^DIC(53,,"QX","OPC")
+ I C0FOPC S FDA(55,"?+1,",3)=C0FOPC
+ D UPDATE^DIE("","FDA","IEN")
  I $D(DIERR) S $EC=",U-UPDATE-FAILED,"
  ;
  ; Pharmacist (we use the value multiple times)
