@@ -151,11 +151,16 @@ PROBFDA ; build FDA array for Problems
  S ORIEN(1)=$$NEXTIEN()
  S PATIEN=$O(^DPT("AFICN",DHPPAT,""))
  S MAPVUID=5217693 ; VUID for SNOMED CT to ICD-10-CM mapping
+ ; Never invent R69. (Illness, unspecified). Prefer explicit HTN maps, then
+ ; Lexicon; reject Lexicon R69 catch-all (stale 757.33 has returned R69 for
+ ; 59621000). Fail the problem row if still unmapped — do not file garbage ICD.
  K LEX
- S DHPICD=$$GETASSN^LEXTRAN1(DHPSCT,MAPVUID)
- S DHPICD=$O(LEX(1,""))
- I DHPICD="" S DHPICD="R69."
+ S DHPICD=$$SCT2ICD(DHPSCT)
+ I DHPICD="" D  Q
+ . S RETSTA="-1^SNOMED CT CODE "_DHPSCT_" not mapped to ICD-10"
  S DHPICD=+$$ICDDX^ICDEX(DHPICD,30)
+ I +DHPICD<1 D  Q
+ . S RETSTA="-1^ICD-10 for SNOMED "_DHPSCT_" not on file"
  S FDA(FN,"+1,",.01)=DHPICD ;diagnosis
  S FDA(FN,"+1,",.02)=PATIEN ;patient name
  S FDA(FN,"+1,",.03)=$$NOW^XLFDT() ;date last modified
@@ -192,6 +197,47 @@ PROBFDA ; build FDA array for Problems
  S FDA(FN,"+1,",1.05)=PRVIEN ;responsible provider
  ;W ! ZW FDA
  Q
+ ;
+SCT2ICD(SCT) ; $$ - SNOMED CT → ICD-10-CM code (never R69)
+ ; Same order as SCTICD10^C0FWCON: prefer C0FWCON when present; else
+ ; ^SYN sct2icd tables → explicit HTN/DM → Lexicon VUID 5217693.
+ ; Reject R69 / R69. catch-all at every step. Empty = unmapped.
+ N ICDTX,IEN,LEX,MAP,MAPVUID,Y
+ S SCT=$G(SCT),(ICDTX,IEN)="" I SCT="" Q ""
+ I $T(SCTICD10^C0FWCON)'="" D  I ICDTX'="" Q ICDTX
+ . S IEN=$$SCTICD10^C0FWCON(SCT) I IEN<1 Q
+ . ; ICDDX needs date + "I" (IEN) form; bare (IEN,30) returns "Invalid Code"
+ . S ICDTX=$P($$ICDDX^ICDEX(IEN,$$DT^XLFDT,30,"I"),"^",2)
+ . I ICDTX=""!(ICDTX["INVALID")!($$ISR69(ICDTX)) S ICDTX=""
+ I $T(MAP^SYNDHPMP)'="" D  I ICDTX'="" Q ICDTX
+ . S MAP=$$MAP^SYNDHPMP("sct2icd",SCT)
+ . I +MAP=1 S ICDTX=$P(MAP,"^",2)
+ . I $$ISR69(ICDTX)!(ICDTX["INVALID") S ICDTX=""
+ I SCT=59621000 Q "I10" ; Essential hypertension
+ I SCT=38341003 Q "I10" ; Hypertensive disorder
+ I SCT=1201005 Q "I10" ; Benign essential hypertension
+ I SCT=44054006 Q "E11.9" ; Type 2 diabetes mellitus
+ I SCT=73211009 Q "E11.9" ; Diabetes mellitus
+ I SCT=46635009 Q "E10.9" ; Type 1 diabetes mellitus
+ I SCT=313436004 Q "E11.9" ; Type 2 DM without complication
+ S MAPVUID=5217693
+ K LEX S Y=$$GETASSN^LEXTRAN1(SCT,MAPVUID)
+ S ICDTX="" S ICDTX=$O(LEX(1,ICDTX))
+ I $$ISR69(ICDTX) S ICDTX=""
+ Q ICDTX
+ ;
+ISR69(CODE) ; $$ - 1 if ICD string is Illness-unspecified catch-all
+ S CODE=$$UP^XLFSTR($G(CODE))
+ I CODE="R69"!(CODE="R69.") Q 1
+ Q 0
+ ;
+OKVTY(SCT) ; $$ - 1 if SCT may be used as Encounter visit-type
+ ; Prefer ISENCS^C0FHIRP when Codex is present; always allow Synthea generic.
+ I $G(SCT)="" Q 0
+ I SCT=308335008 Q 1 ; Patient encounter procedure (Synthea default type)
+ I $T(ISENCS^C0FHIRP)'="" Q $$ISENCS^C0FHIRP(SCT)
+ Q 1 ; SYN-only sites: do not block when Codex helper is absent
+ ;
 PROVNARTL(EXPRSN) ; deal with provider narrative
  ;
  N PROVNAR
@@ -344,10 +390,10 @@ ENCTUPD(RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT,DXICDCS,HFACTORS
  ..S DHPICD=+ICDTX
  ..; Do not abort: unknown ICD falls through like unmapped SNOMED (STD CODES / health factor path)
  .E  D  ;
- ..S MAPPING=$S(APPTDATE>3150930:"sct2icd",1:"sct2icdnine") ; APPTDATE IS IN FM FORMAT
- ..S DHPICD=$$MAP^SYNDHPMP(MAPPING,SCTDX)
- ..I +DHPICD=-1 S RETSTA="-1^SNOMED CT CODE "_SCTDX_" not mapped" Q
- ..I +DHPICD'=-1 S DHPICD=+$$ICDDX^ICDEX($P(DHPICD,U,2),30)
+ ..; P1a/P1b: shared SCT2ICD (tables/C0FWCON/Lexicon) — never file R69 POV
+ ..N ICDTX S ICDTX=$$SCT2ICD(SCTDX)
+ ..I ICDTX="" S RETSTA="-1^SNOMED CT CODE "_SCTDX_" not mapped" Q
+ ..S DHPICD=+$$ICDDX^ICDEX(ICDTX,30)
  ;
  ; map SNOMED CT code in SCTCPT to CPT
  ;S DHPCPT=$S($$MAP^SYNQLDM(SCTCPT)'="":$$MAP^SYNQLDM(SCTCPT),1:92002)
@@ -358,12 +404,14 @@ ENCTUPD(RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT,DXICDCS,HFACTORS
  .S DHPCPT=$P(DHPCPT,U,2)
  .I DHPCPT'="",'$D(^ICPT("B",DHPCPT)) S DHPCPT=""
  E  S DHPCPT=""
+ ; P1c: sct2os5 only for encounter-set SCT; disorder SCT must not silently become OS5.
  I DHPCPT="" D
- .S DHPCPT=$$MAP^SYNDHPMP("sct2os5",SCTCPT)
- .I +DHPCPT'=-1 S DHPCPT=$P(DHPCPT,U,2)
- .E  S DHPCPT=""
- .I DHPCPT'="",'$D(^ICPT("B",DHPCPT)) S DHPCPT=""
- .I DHPCPT="" S DHPCPT="6456Q"
+ .I $$OKVTY(SCTCPT) D
+ ..S DHPCPT=$$MAP^SYNDHPMP("sct2os5",SCTCPT)
+ ..I +DHPCPT'=-1 S DHPCPT=$P(DHPCPT,U,2)
+ ..E  S DHPCPT=""
+ ..I DHPCPT'="",'$D(^ICPT("B",DHPCPT)) S DHPCPT=""
+ .I DHPCPT="" S DHPCPT="6456Q" ; safe default visit OS5 (not disorder-derived)
  ;
  I DHPCPT="" S RETSTA="-1^SNOMED CT CODE "_SCTCPT_" not mapped" Q
  ; create root array
