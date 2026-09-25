@@ -14,6 +14,28 @@ LOADOS5 ; load ^SYN mapping table for SCT to OS5
  d LOADRTN("SYNOS5D4")
  d LOADRTN("SYNOS5D5")
  d LOADRTN("SYNOS5D6")
+ d SPLITOS5 ; P2a: role-filtered sibling maps
+ q
+ ;
+SPLITOS5 ; split sct2os5 into encounter-only and procedure-oriented maps
+ ; sct2os5enc: ISENCS (visit-type role). sct2os5prc: not pure-encounter
+ ; (procedure role). Dual-role SCTs land in both. Keeps full sct2os5 intact.
+ n SCT,OS5,DESC,ENC,DUAL
+ k ^SYN("2002.030","sct2os5enc"),^SYN("2002.030","sct2os5prc")
+ s SCT=""
+ f  s SCT=$O(^SYN("2002.030","sct2os5","direct",SCT)) q:SCT=""  d
+ . s ENC=0,DUAL=0
+ . i $T(ISENCS^C0FHIRP)'="" s ENC=$$ISENCS^C0FHIRP(SCT)
+ . i $T(ISDUALS^C0FHIRP)'="" s DUAL=$$ISDUALS^C0FHIRP(SCT)
+ . s OS5=""
+ . f  s OS5=$O(^SYN("2002.030","sct2os5","direct",SCT,OS5)) q:OS5=""  d
+ . . s DESC=$G(^SYN("2002.030","sct2os5","direct",SCT,OS5))
+ . . i ENC d
+ . . . s ^SYN("2002.030","sct2os5enc","direct",SCT,OS5)=DESC
+ . . . s ^SYN("2002.030","sct2os5enc","inverse",OS5,SCT)=DESC
+ . . i 'ENC!DUAL d
+ . . . s ^SYN("2002.030","sct2os5prc","direct",SCT,OS5)=DESC
+ . . . s ^SYN("2002.030","sct2os5prc","inverse",OS5,SCT)=DESC
  q
  ;
 LOADRTN(ROU) ; load one generated OS5 data routine

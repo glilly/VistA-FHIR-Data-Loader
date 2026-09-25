@@ -33,6 +33,7 @@ MAP(MAP,CODE,DIR,IOE) ; Return a mapped code for a given code
  ;                                          "ctpos2sct (02/01/2019)
  ;                                          "rxn2ndf" (02/01/2019)
  ;                                          "sct2os5" (02/02/2019)
+ ;                                          "sct2os5enc" / "sct2os5prc" (P2a role split)
  ;
  ;   CODE - map source code
  ;   DIR  - direction of mapping

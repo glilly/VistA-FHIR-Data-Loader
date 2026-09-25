@@ -39,10 +39,9 @@ PRCADD(RETSTA,DHPPAT,DHPVST,DHPCNT,DHPSCT,DHPDTM) ;Ingest Procedures
  ;
  D INIT
  ;
- ; use SNOMED CT to OS5 mapping
- S MAPPING="sct2os5"
- ;
- S DHPOS5=$$MAP^SYNDHPMP(MAPPING,DHPSCT)
+ ; P2a: prefer procedure-role OS5 map, then full sct2os5
+ S DHPOS5=$$MAP^SYNDHPMP("sct2os5prc",DHPSCT)
+ I +DHPOS5'=1 S DHPOS5=$$MAP^SYNDHPMP("sct2os5",DHPSCT)
  I +DHPOS5'=1 S RETSTA="-1^Code "_DHPSCT_" not mapped" Q
  S DHPOS5=$P(DHPOS5,U,2)
  ;

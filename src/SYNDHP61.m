@@ -407,7 +407,9 @@ ENCTUPD(RETSTA,DHPPAT,STARTDT,ENDDT,ENCPROV,CLINIC,SCTDX,SCTCPT,DXICDCS,HFACTORS
  ; P1c: sct2os5 only for encounter-set SCT; disorder SCT must not silently become OS5.
  I DHPCPT="" D
  .I $$OKVTY(SCTCPT) D
- ..S DHPCPT=$$MAP^SYNDHPMP("sct2os5",SCTCPT)
+ ..; P2a: prefer encounter-role map, then full sct2os5
+ ..S DHPCPT=$$MAP^SYNDHPMP("sct2os5enc",SCTCPT)
+ ..I +DHPCPT=-1 S DHPCPT=$$MAP^SYNDHPMP("sct2os5",SCTCPT)
  ..I +DHPCPT'=-1 S DHPCPT=$P(DHPCPT,U,2)
  ..E  S DHPCPT=""
  ..I DHPCPT'="",'$D(^ICPT("B",DHPCPT)) S DHPCPT=""
