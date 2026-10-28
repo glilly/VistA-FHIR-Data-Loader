@@ -1,8 +1,35 @@
 # Development Status and Gap Analysis — VistA-FHIR-Data-Loader (SYN)
 
-Status date: 2026-08-07
-Branch at time of writing: `vaready-wd-compat`
+Status date: 2026-10-27 (previous: 2026-08-07)
+Branch at time of writing: `vaready-wd-compat` (188 commits ahead of
+`master`, 3 behind; the reconciliation session is still deferred — see
+`Vista-on-FHIR/docs/PATH_FORWARD.md`)
 
+Reviewed 2026-10-27. Nine commits since the August status, all 2026-08-09 →
+2026-09-25 and all transitional-engine hardening found by the fresh-container
+CI lane and the September `wvehr` / IRIS loads:
+
+- Replay safety: a shared `C0FWLD^SYNFHIRU` guard treats a loaded/skipped
+  marker under any load-domain key as filed, so replaying a C0FW-loaded
+  patient no longer re-files vitals; `SYNFMED2` survives the PSO chain
+  killing `args("load")` (2026-09-12).
+- `SYNFPAN` panel loop SYN-namespaces every local across `LAB^ISIIMP12`
+  (the LR* chain kills common names; the loop had died after the first
+  filing), preserves per-entry status markers across reruns, and
+  `replayIntakeDomains` invalidates the C0FW bundle cache (2026-09-13).
+- `SYNWD` gains a `WDIRECT` backend that resolves the `^%wd` root directly
+  for IRIS, where the `%wd` routine cannot be imported (2026-09-13).
+- `ADDDRUG` no longer `$EC`s or calls rxnav when `ETSRXN` is missing
+  (2026-09-15); `WRITERXPS` files File 55 with the internal DFN, which
+  FileMan 22.0 requires (2026-09-19).
+- SCT→ICD unified through `SCT2ICD` and visit-type OS5 gated to the
+  encounter SCT set; role-specific `sct2os5enc`/`sct2os5prc` map siblings
+  (2026-09-25). `SYNOS5PT` hardening committed (2026-08-09).
+
+No change in trajectory: these are fixes to the engine Codex C0FW still
+falls back to for medications, labs, and procedures. The gap list below is
+otherwise unchanged. SYN routines are loaded into the nightly CI container
+with the source branch@commit recorded in each round-trip report.
 Part of the VistA-on-FHIR workspace. Ecosystem-level context lives in
 `Vista-on-FHIR/docs/PROJECT_OVERVIEW.md`; the cross-repo roadmap is
 `Vista-on-FHIR/docs/PATH_FORWARD.md`.
@@ -31,8 +58,8 @@ is retained for reference only.
 - **Recent (2026-06 → 2026-08):** LOINC `4548-4` / `4549-2` mapped to
   HEMOGLOBIN A1C (`SYNQLDM.m`); RPMS VPR debug-read support; skip
   `SYNFPAN` map init when the routine is not installed (RPMS-safe).
-  Local working tree also has uncommitted `SYNOS5PT.m` hardening (OS5 CPT
-  IEN collision / delimiter) — not part of the committed gate yet.
+  The `SYNOS5PT.m` hardening (OS5 CPT IEN collision / delimiter) was
+  committed 2026-08-09.
 
 - **Intake and orchestration**: `wsPostFHIR^SYNFHIR`, `wsUpdatePatient^SYNFHIRU`,
   `replayIntakeDomains` with selective category replay
