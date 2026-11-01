@@ -172,7 +172,7 @@ APPTADD(RETSTA,DHPPAT,DHPCLIN,DHPAPTDT,DHPLEN) ;Create appointment
  ;convert to external and check date/time against Fileman date/time field
  S Y=APPTDT
  D DD^%DT
- S EXDATE=Y ;Convert to external
+ S EXDATE=$P(Y,":",1,2) ;Convert to external; drop seconds, 2.98 .001 is %DT="ETXR" (FM 22.2 DD^%DT shows them)
  D CHK^DIE(2.98,.001,"",EXDATE,.RESULT,.MSG)
  I RESULT="^" S RETSTA("APPT")="-1^Invalid appt date/time." QUIT
  ;
@@ -288,7 +288,7 @@ APPTCKIN(RETSTA,DHPPAT,DHPCLIN,DHPAPTDT,DHPCIDT) ;Check-in appointment
  ;convert to external and check date/time against Fileman date/time field
  S Y=APPTDT
  D DD^%DT
- S EXDATE=Y ;Convert to external
+ S EXDATE=$P(Y,":",1,2) ;Convert to external; drop seconds, 2.98 .001 is %DT="ETXR" (FM 22.2 DD^%DT shows them)
  D CHK^DIE(2.98,.001,"",EXDATE,.RESULT,.MSG)
  I RESULT="^" S RETSTA("CKIN")="-1^Invalid appt date/time." QUIT
  ;
@@ -303,7 +303,7 @@ APPTCKIN(RETSTA,DHPPAT,DHPCLIN,DHPAPTDT,DHPCIDT) ;Check-in appointment
  . ;convert to external and check date/time against Fileman date/time field
  . S Y=CHKINDT
  . D DD^%DT
- . S EXDATE=Y
+ . S EXDATE=$P(Y,":",1,2) ;drop seconds (see APPTADD)
  . D CHK^DIE(2.98,.001,"",EXDATE,.RESULT,.MSG)
  . I RESULT="^" S RETSTA("CKIN")="-1^Invalid check-in date/time.",BADDATE=1 QUIT
  QUIT:BADDATE
@@ -389,7 +389,7 @@ APTCKOUT(RETSTA,DHPPAT,DHPCLIN,DHPAPTDT,DHPCODT) ;Check-out appointment
  ;convert to external and check date/time against Fileman date/time field
  S Y=APPTDT
  D DD^%DT
- S EXDATE=Y ;Convert to external
+ S EXDATE=$P(Y,":",1,2) ;Convert to external; drop seconds, 2.98 .001 is %DT="ETXR" (FM 22.2 DD^%DT shows them)
  D CHK^DIE(2.98,.001,"",EXDATE,.RESULT,.MSG)
  I RESULT="^" S RETSTA("CKOUT")="-1^Invalid appt date/time." QUIT
  ;
@@ -421,7 +421,7 @@ APTCKOUT(RETSTA,DHPPAT,DHPCLIN,DHPAPTDT,DHPCODT) ;Check-out appointment
  . ;convert to external and check date/time against Fileman date/time field
  . S Y=CHKOUTDT
  . D DD^%DT
- . S EXDATE=Y
+ . S EXDATE=$P(Y,":",1,2) ;drop seconds (see APPTADD)
  . D CHK^DIE(2.98,.001,"",EXDATE,.RESULT,.MSG)
  . I RESULT="^" S RETSTA("CKOUT")="-1^Invalid check-out date/time.",BADDATE=1 QUIT
  QUIT:BADDATE
@@ -496,8 +496,7 @@ APTCKOUT(RETSTA,DHPPAT,DHPCLIN,DHPAPTDT,DHPCODT) ;Check-out appointment
  ;
  N IENS,FDA,ERRMSG
  S IENS=$O(^SCE("APAR",SCEIEN,""))_","
- S FDA(409.68,IENS,.1)=11 ;appointment type
- D FILE^DIE("K","FDA","ERRMSG")
+ I IENS'="," S FDA(409.68,IENS,.1)=11 D FILE^DIE("K","FDA","ERRMSG") ;appointment type on the child stop-code encounter, when the clinic has a credit stop
  I $D(ERRMSG) D  QUIT
  . S RETSTA("CKOUT")="-1^Problem updating outpatient encounter (#409.68) - "_$G(ERRMSG("DIERR",1,"TEXT",1))
  ;
@@ -518,12 +517,8 @@ CHECKCO(COERRMSG,PATDFN,APPTDT) ;
  . S COERRMSG=-1
  . S COERRMSG(ECNT)="No Outpatient Encounter record"
  ;
- I SCEIENP'="" D
- . S SCEIENS=$O(^SCE("APAR",SCEIENP,""))
- . I SCEIENS="" D
- . . S ECNT=ECNT+1
- . . S COERRMSG=-1
- . . S COERRMSG(ECNT)="No Outpatient Encounter stop code record"
+ ; A child stop-code encounter (^SCE "APAR") and child visit (^AUPNVSIT "AD")
+ ; exist only when the clinic has a CREDIT STOP CODE (#44,2503). Not required.
  ;
  S INVDATE=9999999-$P(+APPTDT,".",1)_$S($P(+APPTDT,".",2)'="":"."_$P(+APPTDT,".",2),1:"")
  S VIENP=$O(^AUPNVSIT("AA",PATDFN,INVDATE,""))
@@ -533,12 +528,6 @@ CHECKCO(COERRMSG,PATDFN,APPTDT) ;
  . S COERRMSG(ECNT)="No Visit record"
  ;
  I VIENP'="" D
- . S VIENS=$O(^AUPNVSIT("AD",VIENP,""))
- . I VIENS="" D
- . . S ECNT=ECNT+1
- . . S COERRMSG=-1
- . . S COERRMSG(ECNT)="No Visit stop code record"
- . ;
  . S VPROV=$O(^AUPNVPRV("AD",VIENP,""))
  . I VPROV="" D
  . . S ECNT=ECNT+1
